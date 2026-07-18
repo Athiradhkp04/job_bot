@@ -56,6 +56,9 @@ def main():
 
     raw_jobs = collect_all_jobs(config)
     print(f"[main] total raw jobs collected: {len(raw_jobs)}")
+    print("[main] sample titles collected:")
+    for job in raw_jobs[:15]:
+        print(f"  - {job['title']}")
 
     filtered_jobs = apply_filters(raw_jobs, config)
     print(f"[main] jobs after filtering: {len(filtered_jobs)}")
