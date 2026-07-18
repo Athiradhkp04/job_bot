@@ -67,15 +67,44 @@ filters:
     - "internship"
     - "full-time"
 
-  # remote / hybrid / location substrings to accept (case-insensitive, partial match)
-  locations:
-    - "remote"
-    - "hybrid"
-    - "kerala"
-    - "kochi"
-    - "trivandrum"
-    - "thiruvananthapuram"
-    - "kozhikode"
+  # Location rules: always_allow locations pass regardless of stipend.
+  # conditional groups only pass if stipend exceeds min_stipend (in Rs/month).
+  # Jobs with unparseable stipend text (e.g. "Competitive stipend") get the
+  # benefit of the doubt and pass. "Unpaid" always fails any >0 threshold.
+  location_rules:
+    always_allow:
+      - "remote"
+      - "hybrid"
+      - "kerala"
+      - "kochi"
+      - "cochin"
+      - "trivandrum"
+      - "thiruvananthapuram"
+      - "kozhikode"
+    conditional:
+      - min_stipend: 8000
+        locations:
+          - "chennai"
+          - "coimbatore"
+          - "bangalore"
+          - "bengaluru"
+          - "hyderabad"
+          - "madurai"
+          - "mysore"
+          - "mysuru"
+          - "vizag"
+          - "visakhapatnam"
+          - "vijayawada"
+          - "puducherry"
+          - "pondicherry"
+          - "salem"
+          - "tiruchirappalli"
+          - "trichy"
+          - "mangalore"
+          - "mangaluru"
+      - min_stipend: 15000
+        locations:
+          - "noida"
 
   experience_level:
     - "entry"
