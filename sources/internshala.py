@@ -2,11 +2,21 @@
 Internshala source module.
 
 Internshala has no official public API, so this scrapes their public
-listing pages. Structure has historically been fairly stable, but if
-this starts returning empty results, the CSS selectors below are the
-first thing to check (their HTML classes do change occasionally).
+listing pages. Their CSS class names change periodically (confirmed -
+the original selectors here stopped working within days), so instead
+of hardcoding fragile class names, this parses each job card by:
+  1. Finding the title link via its URL pattern (/internship/detail/...)
+     - much more stable than CSS classes.
+  2. Reading the plain text lines in the card in order, and picking out
+     stipend/duration/posted-date by their recognizable text patterns
+     (e.g. "Rs X /month", "6 Months", "3 weeks ago").
+
+If this still breaks in future, check whether Internshala changed the
+detail-page URL pattern itself (unlikely) before assuming the regex
+patterns below need updating.
 """
 
+import re
 import requests
 from bs4 import BeautifulSoup
 from job_model import make_job
@@ -16,6 +26,77 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                   "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 }
+
+DETAIL_LINK_RE = re.compile(r"/internship/detail/")
+STIPEND_RE = re.compile(
+    r"(₹\s?[\d,]+(\s?-\s?₹?\s?[\d,]+)?\s?/\s?month|unpaid|competitive stipend|performance based)",
+    re.IGNORECASE,
+)
+DURATION_RE = re.compile(r"^\d+\s+months?$", re.IGNORECASE)
+POSTED_RE = re.compile(
+    r"^(few (hours|days|weeks) ago|\d+\s+(hour|hours|day|days|week|weeks|month|months)\s+ago|today|yesterday)$",
+    re.IGNORECASE,
+)
+BADGE_RE = re.compile(r"^(actively hiring|early applicant|fast response)$", re.IGNORECASE)
+
+
+def _parse_card(card, park_default_location="Kerala"):
+    title_link = card.find("a", href=DETAIL_LINK_RE)
+    if not title_link:
+        return None
+
+    title = title_link.get_text(strip=True)
+    href = title_link.get("href", "")
+    link = href if href.startswith("http") else ("https://internshala.com" + href)
+
+    lines = [l.strip() for l in card.get_text("\n").split("\n") if l.strip()]
+
+    # Drop the title line(s) at the start so we don't re-read it as company
+    while lines and lines[0] == title:
+        lines.pop(0)
+
+    company = None
+    location = None
+    stipend = None
+    posted = None
+
+    i = 0
+    if i < len(lines) and BADGE_RE.match(lines[i]):
+        i += 1
+    if i < len(lines):
+        company = lines[i]
+        i += 1
+    while i < len(lines) and BADGE_RE.match(lines[i]):
+        i += 1
+
+    # Next line is location, unless it's actually the stipend/duration line
+    if i < len(lines) and not STIPEND_RE.search(lines[i]) and not DURATION_RE.match(lines[i]):
+        location = lines[i]
+        i += 1
+
+    # Scan forward for stipend
+    for j in range(i, len(lines)):
+        if STIPEND_RE.search(lines[j]):
+            stipend = lines[j]
+            break
+
+    # Scan all lines for a posted-date-shaped line (anchored match avoids
+    # false positives inside description text)
+    for l in lines:
+        if POSTED_RE.match(l):
+            posted = l
+            break
+
+    return make_job(
+        title=title,
+        company=company,
+        location=location or park_default_location,
+        employment_type="Internship",
+        stipend=stipend,
+        date_posted=posted,
+        link=link,
+        source="Internshala",
+    )
 
 
 def fetch(config):
@@ -39,29 +120,9 @@ def fetch(config):
 
         for card in cards:
             try:
-                title_el = card.select_one("h3.job-internship-name a")
-                company_el = card.select_one("p.company-name")
-                location_el = card.select_one("p.locations span a")
-                stipend_el = card.select_one("span.stipend")
-                posted_el = card.select_one("div.status-inactive, div.other_label_ribbon")
-
-                title = title_el.get_text(strip=True) if title_el else None
-                link = ("https://internshala.com" + title_el["href"]) if title_el and title_el.has_attr("href") else None
-                company = company_el.get_text(strip=True) if company_el else None
-                location_text = location_el.get_text(strip=True) if location_el else "Kerala"
-                stipend = stipend_el.get_text(strip=True) if stipend_el else None
-                posted = posted_el.get_text(strip=True) if posted_el else None
-
-                jobs.append(make_job(
-                    title=title,
-                    company=company,
-                    location=location_text,
-                    employment_type="Internship",
-                    stipend=stipend,
-                    date_posted=posted,
-                    link=link,
-                    source=f"Internshala ({category})",
-                ))
+                job = _parse_card(card)
+                if job:
+                    jobs.append(job)
             except Exception as e:
                 print(f"[internshala] skipped one card in '{category}' due to parse error: {e}")
                 continue
