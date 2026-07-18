@@ -20,49 +20,50 @@ HEADERS = {
 
 def fetch(config):
     src_cfg = config["sources"]["internshala"]
-    category = src_cfg.get("category", "computer-science")
+    categories = src_cfg.get("categories", ["data-science"])
     location = src_cfg.get("location", "kerala")
 
-    url = BASE_URL.format(category=category, location=location)
     jobs = []
 
-    try:
-        resp = requests.get(url, headers=HEADERS, timeout=15)
-        resp.raise_for_status()
-    except requests.RequestException as e:
-        print(f"[internshala] fetch failed: {e}")
-        return jobs
-
-    soup = BeautifulSoup(resp.text, "html.parser")
-    cards = soup.select("div.individual_internship")
-
-    for card in cards:
+    for category in categories:
+        url = BASE_URL.format(category=category, location=location)
         try:
-            title_el = card.select_one("h3.job-internship-name a")
-            company_el = card.select_one("p.company-name")
-            location_el = card.select_one("p.locations span a")
-            stipend_el = card.select_one("span.stipend")
-            posted_el = card.select_one("div.status-inactive, div.other_label_ribbon")
-
-            title = title_el.get_text(strip=True) if title_el else None
-            link = ("https://internshala.com" + title_el["href"]) if title_el and title_el.has_attr("href") else None
-            company = company_el.get_text(strip=True) if company_el else None
-            location_text = location_el.get_text(strip=True) if location_el else "Kerala"
-            stipend = stipend_el.get_text(strip=True) if stipend_el else None
-            posted = posted_el.get_text(strip=True) if posted_el else None
-
-            jobs.append(make_job(
-                title=title,
-                company=company,
-                location=location_text,
-                employment_type="Internship",
-                stipend=stipend,
-                date_posted=posted,
-                link=link,
-                source="Internshala",
-            ))
-        except Exception as e:
-            print(f"[internshala] skipped one card due to parse error: {e}")
+            resp = requests.get(url, headers=HEADERS, timeout=15)
+            resp.raise_for_status()
+        except requests.RequestException as e:
+            print(f"[internshala] fetch failed for category '{category}': {e}")
             continue
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        cards = soup.select("div.individual_internship")
+
+        for card in cards:
+            try:
+                title_el = card.select_one("h3.job-internship-name a")
+                company_el = card.select_one("p.company-name")
+                location_el = card.select_one("p.locations span a")
+                stipend_el = card.select_one("span.stipend")
+                posted_el = card.select_one("div.status-inactive, div.other_label_ribbon")
+
+                title = title_el.get_text(strip=True) if title_el else None
+                link = ("https://internshala.com" + title_el["href"]) if title_el and title_el.has_attr("href") else None
+                company = company_el.get_text(strip=True) if company_el else None
+                location_text = location_el.get_text(strip=True) if location_el else "Kerala"
+                stipend = stipend_el.get_text(strip=True) if stipend_el else None
+                posted = posted_el.get_text(strip=True) if posted_el else None
+
+                jobs.append(make_job(
+                    title=title,
+                    company=company,
+                    location=location_text,
+                    employment_type="Internship",
+                    stipend=stipend,
+                    date_posted=posted,
+                    link=link,
+                    source=f"Internshala ({category})",
+                ))
+            except Exception as e:
+                print(f"[internshala] skipped one card in '{category}' due to parse error: {e}")
+                continue
 
     return jobs

@@ -12,31 +12,48 @@ telegram:
 # --- Sources to run (comment out / set enabled: false to disable) ---
 sources:
   indeed:
-    enabled: true
+    enabled: false   # Indeed blocks non-browser traffic (403 error). Not a quick fix - re-enable later if you want to tackle it.
     query: "software engineer"
     location: "Kerala, India"
   internshala:
     enabled: true
-    category: "computer-science"       # matches internshala URL category slug
+    categories:                          # matches internshala URL category slugs
+      - "data-science"
+      - "business-analyst"
+      - "hr"
+      - "digital-marketing"
     location: "kerala"
   technopark_infopark:
-    enabled: true
+    enabled: false   # Site is JavaScript-rendered - a plain scrape can't see listings. Needs a headless browser to fix properly.
   kerala_gov:
-    enabled: true
+    enabled: false   # Returned 0 jobs - likely JS-rendered too, or different page structure than expected.
 
 # --- Filtering rules ---
 filters:
   # Keywords - job title must contain at least one of these (case-insensitive)
   roles:
-    - "software engineer"
-    - "developer"
-    - "frontend"
-    - "backend"
-    - "full stack"
-    - "sde"
-    - "python"
     - "data analyst"
+    - "data science"
+    - "data scientist"
+    - "business analyst"
+    - "business intelligence"
+    - " bi "
+    - "power bi"
+    - "sql"
+    - "hr "
+    - "human resource"
+    - "recruitment"
+    - "talent acquisition"
+    - "workforce"
+    - "seo"
+    - "digital marketing"
+    - "search engine"
+    - "dashboard"
+    - "reporting analyst"
+    - "kpi"
+    - "analytics"
     - "machine learning"
+    - "python"
 
   # Keywords that immediately disqualify a job if found in the title
   exclude_keywords:
