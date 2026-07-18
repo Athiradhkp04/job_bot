@@ -1,0 +1,79 @@
+# =========================================
+# Job Bot Configuration
+# Edit this file to change what jobs you see.
+# No code changes needed for filter tweaks.
+# =========================================
+
+# --- Telegram ---
+telegram:
+  bot_token: "${TELEGRAM_BOT_TOKEN}"   # set as GitHub Actions secret, not here
+  chat_id: "${TELEGRAM_CHAT_ID}"       # set as GitHub Actions secret, not here
+
+# --- Sources to run (comment out / set enabled: false to disable) ---
+sources:
+  indeed:
+    enabled: true
+    query: "software engineer"
+    location: "Kerala, India"
+  internshala:
+    enabled: true
+    category: "computer-science"       # matches internshala URL category slug
+    location: "kerala"
+  technopark_infopark:
+    enabled: true
+  kerala_gov:
+    enabled: true
+
+# --- Filtering rules ---
+filters:
+  # Keywords - job title must contain at least one of these (case-insensitive)
+  roles:
+    - "software engineer"
+    - "developer"
+    - "frontend"
+    - "backend"
+    - "full stack"
+    - "sde"
+    - "python"
+    - "data analyst"
+    - "machine learning"
+
+  # Keywords that immediately disqualify a job if found in the title
+  exclude_keywords:
+    - "senior"
+    - "lead"
+    - "manager"
+    - "10+ years"
+    - "principal"
+
+  employment_type:
+    - "internship"
+    - "full-time"
+
+  # remote / hybrid / location substrings to accept (case-insensitive, partial match)
+  locations:
+    - "remote"
+    - "hybrid"
+    - "kerala"
+    - "kochi"
+    - "trivandrum"
+    - "thiruvananthapuram"
+    - "kozhikode"
+
+  experience_level:
+    - "entry"
+    - "fresher"
+    - "0-1 year"
+    - "intern"
+
+  # Only show jobs posted within this many days
+  max_age_days: 5
+
+# --- Output ---
+output:
+  max_jobs_per_message: 10
+
+# --- Dedup ---
+dedup:
+  state_file: "seen_jobs.json"
+  prune_after_days: 30
