@@ -17,6 +17,10 @@ Pulls from two sections:
     `fresher_job_categories` list - added specifically so Data Analyst
     fresher job vacancies show up too, not just internships.
 
+Also paginates (page-2/, page-3/, etc.) since Internshala listing
+pages only show the first ~20-30 cards on page 1 - anything beyond
+that was previously being silently missed entirely.
+
 If this still breaks in future, check whether Internshala changed the
 detail-page URL pattern itself (unlikely) before assuming the regex
 patterns below need updating.
@@ -111,44 +115,67 @@ def _fetch_listing(url):
         return None
 
 
+def _page_url(base_url, page):
+    if page == 1:
+        return base_url
+    return base_url.rstrip("/") + f"/page-{page}/"
+
+
+def _fetch_category(base_url_template, category, location, employment_type, max_pages):
+    """
+    Fetches a category across multiple pages, stopping early once a page
+    comes back with few/no cards (either genuinely out of Kerala-specific
+    results, or Internshala's "no more matching, here's other opportunities"
+    filler has kicked in).
+    """
+    jobs = []
+    base_url = base_url_template.format(category=category, location=location)
+
+    for page in range(1, max_pages + 1):
+        url = _page_url(base_url, page)
+        html = _fetch_listing(url)
+        if not html:
+            break
+
+        soup = BeautifulSoup(html, "html.parser")
+        cards = soup.select("div.individual_internship, div.individual_job")
+
+        if not cards:
+            print(f"[internshala] '{category}' page {page}: no cards, stopping pagination")
+            break
+
+        page_job_count = 0
+        for card in cards:
+            try:
+                job = _parse_card(card, employment_type=employment_type)
+                if job:
+                    jobs.append(job)
+                    page_job_count += 1
+            except Exception as e:
+                print(f"[internshala] skipped one card in '{category}' page {page}: {e}")
+                continue
+
+        print(f"[internshala] '{category}' page {page}: {page_job_count} jobs")
+
+        if len(cards) < 10:
+            break
+
+    return jobs
+
+
 def fetch(config):
     src_cfg = config["sources"]["internshala"]
     categories = src_cfg.get("categories", ["data-science"])
     fresher_job_categories = src_cfg.get("fresher_job_categories", [])
     location = src_cfg.get("location", "kerala")
+    max_pages = src_cfg.get("max_pages_per_category", 3)
 
     jobs = []
 
     for category in categories:
-        url = BASE_URL.format(category=category, location=location)
-        html = _fetch_listing(url)
-        if not html:
-            continue
-        soup = BeautifulSoup(html, "html.parser")
-        cards = soup.select("div.individual_internship")
-        for card in cards:
-            try:
-                job = _parse_card(card, employment_type="Internship")
-                if job:
-                    jobs.append(job)
-            except Exception as e:
-                print(f"[internshala] skipped one internship card in '{category}': {e}")
-                continue
+        jobs.extend(_fetch_category(BASE_URL, category, location, "Internship", max_pages))
 
     for category in fresher_job_categories:
-        url = FRESHER_JOBS_BASE_URL.format(category=category, location=location)
-        html = _fetch_listing(url)
-        if not html:
-            continue
-        soup = BeautifulSoup(html, "html.parser")
-        cards = soup.select("div.individual_internship, div.individual_job")
-        for card in cards:
-            try:
-                job = _parse_card(card, employment_type="Full-time (Fresher)")
-                if job:
-                    jobs.append(job)
-            except Exception as e:
-                print(f"[internshala] skipped one fresher job card in '{category}': {e}")
-                continue
+        jobs.extend(_fetch_category(FRESHER_JOBS_BASE_URL, category, location, "Full-time (Fresher)", max_pages))
 
     return jobs

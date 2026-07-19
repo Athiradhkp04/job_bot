@@ -25,6 +25,7 @@ sources:
     fresher_job_categories:              # also pulls full-time FRESHER JOBS (not just internships) for these
       - "data-analyst"
     location: "kerala"
+    max_pages_per_category: 3            # how many pages deep to check per category (catches listings beyond page 1)
   technopark_infopark:
     enabled: false   # Site is JavaScript-rendered - a plain scrape can't see listings. Needs a headless browser to fix properly.
   kerala_gov:
@@ -83,6 +84,7 @@ filters:
       - "trivandrum"
       - "thiruvananthapuram"
       - "kozhikode"
+      - "Calicut"
     conditional:
       - min_stipend: 8000
         locations:
@@ -115,7 +117,7 @@ filters:
     - "intern"
 
   # Only show jobs posted within this many days
-  max_age_days: 5
+  max_age_days: 7
 
 # --- Priority ordering ---
 # When there are more new matches than fit in one message, jobs in
