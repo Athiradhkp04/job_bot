@@ -12,6 +12,7 @@ import yaml
 
 from filter import apply_filters
 from dedup import filter_new_jobs
+from priority import sort_by_priority
 from notify import format_message, send_telegram_message
 
 from sources import indeed, internshala, technopark_infopark, kerala_gov
@@ -27,7 +28,6 @@ SOURCE_MODULES = {
 def load_config(path="config.yaml"):
     with open(path, "r") as f:
         raw = f.read()
-    # Substitute ${ENV_VAR} references with actual environment variables
     for key, value in os.environ.items():
         raw = raw.replace(f"${{{key}}}", value)
     return yaml.safe_load(raw)
@@ -45,7 +45,6 @@ def collect_all_jobs(config):
             print(f"[main] {name} returned {len(jobs)} jobs")
             all_jobs.extend(jobs)
         except Exception as e:
-            # One source failing should never kill the whole run
             print(f"[main] {name} failed entirely: {e}")
             continue
     return all_jobs
@@ -65,6 +64,8 @@ def main():
 
     new_jobs = filter_new_jobs(filtered_jobs, config)
     print(f"[main] new jobs after dedup: {len(new_jobs)}")
+
+    new_jobs = sort_by_priority(new_jobs, config)
 
     max_jobs = config.get("output", {}).get("max_jobs_per_message", 10)
     message = format_message(new_jobs, max_jobs)

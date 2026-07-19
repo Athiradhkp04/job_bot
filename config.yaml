@@ -17,11 +17,13 @@ sources:
     location: "Kerala, India"
   internshala:
     enabled: true
-    categories:                          # matches internshala URL category slugs
+    categories:                          # matches internshala URL category slugs (internships)
       - "data-science"
       - "business-analyst"
       - "hr"
       - "digital-marketing"
+    fresher_job_categories:              # also pulls full-time FRESHER JOBS (not just internships) for these
+      - "data-analyst"
     location: "kerala"
   technopark_infopark:
     enabled: false   # Site is JavaScript-rendered - a plain scrape can't see listings. Needs a headless browser to fix properly.
@@ -114,6 +116,43 @@ filters:
 
   # Only show jobs posted within this many days
   max_age_days: 5
+
+# --- Priority ordering ---
+# When there are more new matches than fit in one message, jobs in
+# earlier tiers are kept and shown first; jobs in later tiers are the
+# first to be cut. "bypass_if_stipend_above" lets a lower tier jump to
+# top priority if it pays well enough (value is monthly Rs, annual
+# salaries are auto-converted to monthly-equivalent for comparison).
+priority:
+  tiers:
+    - name: "Data/Business Analytics & BI"
+      keywords:
+        - "data analyst"
+        - "data analytics"
+        - "data science"
+        - "data scientist"
+        - "business analyst"
+        - "business analytics"
+        - "business intelligence"
+        - " bi "
+        - "power bi"
+        - "kpi"
+        - "dashboard"
+    - name: "SEO"
+      keywords:
+        - "seo"
+        - "search engine"
+    - name: "HR"
+      keywords:
+        - "hr "
+        - "human resource"
+        - "recruitment"
+        - "talent acquisition"
+        - "workforce"
+    - name: "Digital Marketing"
+      keywords:
+        - "digital marketing"
+      bypass_if_stipend_above: 12000   # if it pays > 12k/month, treat as top priority instead
 
 # --- Output ---
 output:

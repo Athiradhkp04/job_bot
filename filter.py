@@ -17,10 +17,12 @@ def _contains_any(text, keywords):
 
 def parse_stipend_value(stipend_str):
     """
-    Extracts a comparable numeric value from a stipend string.
+    Extracts a comparable MONTHLY numeric value from a stipend string.
     Returns:
       - 0 for "Unpaid"
       - the lower bound of a range (conservative - guarantees at least this much)
+      - annual figures ("/year", "/annum") are converted to monthly-equivalent
+        by dividing by 12, so they compare fairly against monthly thresholds
       - None if it can't be parsed (e.g. "Competitive stipend", "Not disclosed")
     """
     if not stipend_str:
@@ -32,11 +34,13 @@ def parse_stipend_value(stipend_str):
     if not numbers:
         return None
     values = [int(n.replace(",", "")) for n in numbers]
-    return min(values)
+    value = min(values)
+    if re.search(r"/\s?(year|annum)", s):
+        value = value / 12
+    return value
 
 
 def passes_location_rules(location, stipend_value, location_rules):
-    # No location data - don't over-filter on missing info
     if not location or location == "Not specified":
         return True
 
@@ -51,11 +55,9 @@ def passes_location_rules(location, stipend_value, location_rules):
         if _contains_any(location_lower, group_locations):
             min_stipend = rule.get("min_stipend", 0)
             if stipend_value is None:
-                # Can't verify stipend (e.g. "Competitive stipend") - benefit of the doubt
                 return True
             return stipend_value > min_stipend
 
-    # Location didn't match any allowed group at all
     return False
 
 
@@ -64,11 +66,9 @@ def passes_filters(job, filters):
     location = job.get("location", "")
     stipend = job.get("stipend", "")
 
-    # Must match at least one desired role keyword
     if filters.get("roles") and not _contains_any(title, filters["roles"]):
         return False
 
-    # Must NOT match any exclude keyword
     if filters.get("exclude_keywords") and _contains_any(title, filters["exclude_keywords"]):
         return False
 
