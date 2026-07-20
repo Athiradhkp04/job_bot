@@ -113,6 +113,20 @@ filters:
     - "10+ years"
     - "principal"
 
+  # Locations to reject ALWAYS - applies even to role_groups with
+  # bypass_location_and_stipend: true (e.g. core roles). This is a hard
+  # "never show me this" rule, separate from location_rules below.
+  excluded_locations:
+    - "maharashtra"
+    - "mumbai"
+    - "pune"
+    - "nagpur"
+    - "nashik"
+    - "thane"
+    - "navi mumbai"
+    - "aurangabad"
+    - "kolhapur"
+
   # Location rules: always_allow locations pass regardless of stipend.
   # conditional groups only pass if stipend exceeds min_stipend (in Rs/month).
   # Jobs with unparseable stipend text (e.g. "Competitive stipend") get the
@@ -154,12 +168,93 @@ filters:
         locations:
           - "noida"
 
+  # Secondary sort order WITHIN each role_group's priority tier - doesn't
+  # affect whether a job passes the filter, only what order matching jobs
+  # show up in. Lower rank = shown first.
+  #   rank: fixed rank, always applies once location matches
+  #   min_stipend + rank_if_above/rank_if_below: conditional rank depending
+  #     on whether the job's monthly-equivalent stipend clears the bar
+  #   default_rank: used for anything that doesn't match a listed tier
+  #     (this is your "rest should be same" case), and for Remote/Hybrid
+  #     jobs with no specific city attached
+  location_priority:
+    default_rank: 3
+    tiers:
+      - name: "kerala"
+        rank: 0
+        locations:
+          - "kerala"
+          - "kochi"
+          - "cochin"
+          - "trivandrum"
+          - "thiruvananthapuram"
+          - "kozhikode"
+          - "calicut"
+      - name: "bangalore_mysore"
+        rank: 1
+        locations:
+          - "bangalore"
+          - "bengaluru"
+          - "mysore"
+          - "mysuru"
+      - name: "tamil_nadu"
+        min_stipend: 8000
+        rank_if_above: 2       # pays well -> priority boost
+        rank_if_below: null    # doesn't clear bar -> falls to default_rank (null = use default_rank)
+        locations:
+          - "chennai"
+          - "coimbatore"
+          - "madurai"
+          - "salem"
+          - "tiruchirappalli"
+          - "trichy"
+          - "tamil nadu"
+          - "vellore"
+          - "erode"
+          - "tirupur"
+      - name: "north_india"
+        min_stipend: 15000
+        rank_if_above: null    # pays well -> no longer penalized, falls to default_rank
+        rank_if_below: 4       # doesn't clear bar -> deprioritized
+        locations:
+          - "delhi"
+          - "new delhi"
+          - "noida"
+          - "gurgaon"
+          - "gurugram"
+          - "uttar pradesh"
+          - "punjab"
+          - "haryana"
+          - "rajasthan"
+          - "bihar"
+          - "jharkhand"
+          - "madhya pradesh"
+          - "chandigarh"
+          - "lucknow"
+          - "jaipur"
+          - "kanpur"
+          - "indore"
+          - "bhopal"
+          - "patna"
+          - "jabalpur"
+          - "ghaziabad"
+          - "faridabad"
+          - "dehradun"
+          - "uttarakhand"
+          - "himachal"
+          - "jammu"
+          - "kashmir"
+          - "gwalior"
+          - "ahmedabad"
+          - "gujarat"
+          - "surat"
+
   # Only show jobs posted within this many days
   max_age_days: 7
 
 # --- Output ---
 output:
-  max_jobs_per_message: 10
+  max_jobs_per_message: 12
 
 # --- Dedup ---
 dedup:

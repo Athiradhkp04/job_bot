@@ -89,10 +89,6 @@ def passes_location_rules(location, stipend_value, location_rules):
 
 
 def find_matching_group(title, role_groups):
-    """
-    Returns the first role_group whose keywords match the title, or None
-    if the job doesn't belong to any configured group at all.
-    """
     for group in role_groups:
         if _contains_any(title, group.get("keywords", [])):
             return group
@@ -111,6 +107,10 @@ def passes_filters(job, filters):
         return False
 
     if filters.get("exclude_keywords") and _contains_any(title, filters["exclude_keywords"]):
+        return False
+
+    excluded_locations = filters.get("excluded_locations")
+    if excluded_locations and _contains_any(location, excluded_locations):
         return False
 
     if not matched_group.get("bypass_location_and_stipend", False):
