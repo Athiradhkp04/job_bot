@@ -22,8 +22,10 @@ sources:
       - "business-analyst"
       - "hr"
       - "digital-marketing"
+      - "full-stack-development"
     fresher_job_categories:              # also pulls full-time FRESHER JOBS (not just internships) for these
       - "data-analyst"
+      - "full-stack-development"
     location: "kerala"
     max_pages_per_category: 3            # how many pages deep to check per category (catches listings beyond page 1)
   technopark_infopark:
@@ -32,33 +34,78 @@ sources:
     enabled: false   # Returned 0 jobs - likely JS-rendered too, or different page structure than expected.
 
 # --- Filtering rules ---
+# role_groups is the single source of truth for BOTH which jobs pass the
+# filter AND what order they're prioritized in (list order = priority
+# order - first group listed = highest priority).
+#
+# Each group:
+#   keywords: broad set of phrasings to catch (e.g. "data scientist" and
+#     "data science intern" are both covered so neither gets missed)
+#   bypass_location_and_stipend: true = accept from ANYWHERE, any pay
+#     (used for your top-priority core roles)
+#   bypass_if_stipend_above: a LOWER-priority group can jump to top
+#     priority if it pays above this monthly Rs figure
 filters:
-  # Keywords - job title must contain at least one of these (case-insensitive)
-  roles:
-    - "data analyst"
-    - "data science"
-    - "data scientist"
-    - "business analyst"
-    - "business intelligence"
-    - " bi "
-    - "power bi"
-    - "sql"
-    - "hr "
-    - "human resource"
-    - "recruitment"
-    - "talent acquisition"
-    - "workforce"
-    - "seo"
-    - "digital marketing"
-    - "search engine"
-    - "dashboard"
-    - "reporting analyst"
-    - "kpi"
-    - "analytics"
-    - "machine learning"
-    - "python"
+  role_groups:
+    - name: "core"                       # Data Analyst / Data Scientist / Business Analyst - top priority
+      bypass_location_and_stipend: true  # no location or stipend restriction at all
+      keywords:
+        - "data analyst"
+        - "data analytics"
+        - "data analysis"
+        - "data scientist"
+        - "data science"
+        - "business analyst"
+        - "business analytics"
+        - "business intelligence"
+        - " bi "
+        - "power bi"
+        - "kpi"
+        - "dashboard"
+        - "reporting analyst"
+        - "machine learning"
+        - "python"
+        - "sql"
+    - name: "seo"                        # Internship or fresher job only, location/stipend rules apply
+      bypass_location_and_stipend: false
+      keywords:
+        - "seo"
+        - "search engine optimization"
+        - "search engine optimisation"
+        - "search engine"
+    - name: "hr"                         # Internship only (HR isn't in fresher_job_categories), location/stipend rules apply
+      bypass_location_and_stipend: false
+      keywords:
+        - "hr "
+        - "hr executive"
+        - "hr intern"
+        - "hr generalist"
+        - "hr operations"
+        - "human resource"
+        - "human resources"
+        - "recruitment"
+        - "talent acquisition"
+        - "workforce"
+    - name: "full_stack"                 # Internship or fresher job, location/stipend rules apply
+      bypass_location_and_stipend: false
+      keywords:
+        - "full stack"
+        - "full-stack"
+        - "fullstack"
+        - "full stack developer"
+        - "full stack development"
+        - "mern stack"
+        - "mean stack"
+        - "mern"
+        - "mean"
+    - name: "digital_marketing"          # Lowest priority, but bypasses to top if it pays well
+      bypass_location_and_stipend: false
+      bypass_if_stipend_above: 12000     # >12k/month -> treat as top priority
+      keywords:
+        - "digital marketing"
 
-  # Keywords that immediately disqualify a job if found in the title
+  # Keywords that immediately disqualify a job if found in the title,
+  # regardless of which role_group it matched
   exclude_keywords:
     - "senior"
     - "lead"
@@ -66,14 +113,11 @@ filters:
     - "10+ years"
     - "principal"
 
-  employment_type:
-    - "internship"
-    - "full-time"
-
   # Location rules: always_allow locations pass regardless of stipend.
   # conditional groups only pass if stipend exceeds min_stipend (in Rs/month).
   # Jobs with unparseable stipend text (e.g. "Competitive stipend") get the
   # benefit of the doubt and pass. "Unpaid" always fails any >0 threshold.
+  # NOTE: only applies to role_groups where bypass_location_and_stipend is false.
   location_rules:
     always_allow:
       - "remote"
@@ -84,7 +128,7 @@ filters:
       - "trivandrum"
       - "thiruvananthapuram"
       - "kozhikode"
-      - "Calicut"
+      - "calicut"
     conditional:
       - min_stipend: 8000
         locations:
@@ -110,51 +154,8 @@ filters:
         locations:
           - "noida"
 
-  experience_level:
-    - "entry"
-    - "fresher"
-    - "0-1 year"
-    - "intern"
-
   # Only show jobs posted within this many days
   max_age_days: 7
-
-# --- Priority ordering ---
-# When there are more new matches than fit in one message, jobs in
-# earlier tiers are kept and shown first; jobs in later tiers are the
-# first to be cut. "bypass_if_stipend_above" lets a lower tier jump to
-# top priority if it pays well enough (value is monthly Rs, annual
-# salaries are auto-converted to monthly-equivalent for comparison).
-priority:
-  tiers:
-    - name: "Data/Business Analytics & BI"
-      keywords:
-        - "data analyst"
-        - "data analytics"
-        - "data science"
-        - "data scientist"
-        - "business analyst"
-        - "business analytics"
-        - "business intelligence"
-        - " bi "
-        - "power bi"
-        - "kpi"
-        - "dashboard"
-    - name: "SEO"
-      keywords:
-        - "seo"
-        - "search engine"
-    - name: "HR"
-      keywords:
-        - "hr "
-        - "human resource"
-        - "recruitment"
-        - "talent acquisition"
-        - "workforce"
-    - name: "Digital Marketing"
-      keywords:
-        - "digital marketing"
-      bypass_if_stipend_above: 12000   # if it pays > 12k/month, treat as top priority instead
 
 # --- Output ---
 output:

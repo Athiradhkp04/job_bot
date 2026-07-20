@@ -28,13 +28,6 @@ def _contains_any(text, keywords):
 
 
 def parse_age_in_days(date_posted_str):
-    """
-    Converts Internshala-style relative date text ("4 days ago", "1 week
-    ago", "Today", "Unknown") into a number of days. Returns None if it
-    can't be parsed - callers should treat unknown age as passing (benefit
-    of the doubt) rather than dropping a job just because we couldn't read
-    its date.
-    """
     if not date_posted_str:
         return None
     s = date_posted_str.strip()
@@ -59,15 +52,6 @@ def parse_age_in_days(date_posted_str):
 
 
 def parse_stipend_value(stipend_str):
-    """
-    Extracts a comparable MONTHLY numeric value from a stipend string.
-    Returns:
-      - 0 for "Unpaid"
-      - the lower bound of a range (conservative - guarantees at least this much)
-      - annual figures ("/year", "/annum") are converted to monthly-equivalent
-        by dividing by 12, so they compare fairly against monthly thresholds
-      - None if it can't be parsed (e.g. "Competitive stipend", "Not disclosed")
-    """
     if not stipend_str:
         return None
     s = stipend_str.lower()
@@ -104,23 +88,37 @@ def passes_location_rules(location, stipend_value, location_rules):
     return False
 
 
+def find_matching_group(title, role_groups):
+    """
+    Returns the first role_group whose keywords match the title, or None
+    if the job doesn't belong to any configured group at all.
+    """
+    for group in role_groups:
+        if _contains_any(title, group.get("keywords", [])):
+            return group
+    return None
+
+
 def passes_filters(job, filters):
     title = job.get("title", "")
     location = job.get("location", "")
     stipend = job.get("stipend", "")
     date_posted = job.get("date_posted", "")
 
-    if filters.get("roles") and not _contains_any(title, filters["roles"]):
+    role_groups = filters.get("role_groups", [])
+    matched_group = find_matching_group(title, role_groups)
+    if not matched_group:
         return False
 
     if filters.get("exclude_keywords") and _contains_any(title, filters["exclude_keywords"]):
         return False
 
-    location_rules = filters.get("location_rules")
-    if location_rules:
-        stipend_value = parse_stipend_value(stipend)
-        if not passes_location_rules(location, stipend_value, location_rules):
-            return False
+    if not matched_group.get("bypass_location_and_stipend", False):
+        location_rules = filters.get("location_rules")
+        if location_rules:
+            stipend_value = parse_stipend_value(stipend)
+            if not passes_location_rules(location, stipend_value, location_rules):
+                return False
 
     max_age_days = filters.get("max_age_days")
     if max_age_days is not None:
