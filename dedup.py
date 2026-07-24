@@ -50,17 +50,30 @@ def filter_new_jobs(jobs, config):
     state_file = dedup_cfg.get("state_file", "seen_jobs.json")
     prune_after_days = dedup_cfg.get("prune_after_days", 30)
 
-    seen = load_seen(state_file)
-    seen = prune_old(seen, prune_after_days)
+    abs_path = os.path.abspath(state_file)
+    print(f"[dedup] reading state file from: {abs_path}")
+
+    seen_before_prune = load_seen(state_file)
+    print(f"[dedup] state file has {len(seen_before_prune)} entries before pruning")
+
+    seen = prune_old(seen_before_prune, prune_after_days)
+    if len(seen) != len(seen_before_prune):
+        print(f"[dedup] pruned {len(seen_before_prune) - len(seen)} entries older than {prune_after_days} days")
 
     today = datetime.utcnow().strftime("%Y-%m-%d")
     new_jobs = []
+    already_seen_count = 0
 
     for job in jobs:
         h = job_hash(job)
         if h not in seen:
             new_jobs.append(job)
             seen[h] = today
+        else:
+            already_seen_count += 1
+
+    print(f"[dedup] of {len(jobs)} filtered jobs: {len(new_jobs)} new, {already_seen_count} already seen")
 
     save_seen(state_file, seen)
+    print(f"[dedup] saved {len(seen)} total entries back to state file")
     return new_jobs

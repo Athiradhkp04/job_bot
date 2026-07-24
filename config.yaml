@@ -27,6 +27,7 @@ sources:
       - "data-analyst"
       - "full-stack-development"
     location: "kerala"
+
     max_pages_per_category: 3            # how many pages deep to check per category (catches listings beyond page 1)
   technopark_infopark:
     enabled: false   # Site is JavaScript-rendered - a plain scrape can't see listings. Needs a headless browser to fix properly.
@@ -47,7 +48,7 @@ sources:
 #     priority if it pays above this monthly Rs figure
 filters:
   role_groups:
-    - name: "core"                       # Data Analyst / Data Scientist / Business Analyst - top priority
+    - name: "core"                       # Data Analyst / Data Scientist / Business Analyst / BI / MIS - top priority
       bypass_location_and_stipend: true  # no location or stipend restriction at all
       keywords:
         - "data analyst"
@@ -59,10 +60,17 @@ filters:
         - "business analytics"
         - "business intelligence"
         - " bi "
+        - "bi analyst"
+        - "bi developer"
         - "power bi"
         - "kpi"
         - "dashboard"
         - "reporting analyst"
+        - "mis analyst"
+        - "mis executive"
+        - "insights analyst"
+        - "junior data analyst"
+        - "associate data analyst"
         - "machine learning"
         - "python"
         - "sql"
@@ -70,9 +78,29 @@ filters:
       bypass_location_and_stipend: false
       keywords:
         - "seo"
+        - "seo analyst"
+        - "seo executive"
+        - "seo specialist"
+        - "seo consultant"
+        - "seo auditor"
         - "search engine optimization"
         - "search engine optimisation"
         - "search engine"
+    - name: "analyst_adjacent"           # Marketing/Product/Research/RevOps analysts - real skill overlap per resume
+      bypass_location_and_stipend: false
+      keywords:
+        - "marketing analyst"
+        - "digital marketing analyst"
+        - "web analytics analyst"
+        - "web analytics"
+        - "growth analyst"
+        - "revops analyst"
+        - "revenue operations analyst"
+        - "sales operations analyst"
+        - "sales ops analyst"
+        - "product analyst"
+        - "research analyst"
+        - "market research analyst"
     - name: "hr"                         # Internship only (HR isn't in fresher_job_categories), location/stipend rules apply
       bypass_location_and_stipend: false
       keywords:
@@ -81,9 +109,13 @@ filters:
         - "hr intern"
         - "hr generalist"
         - "hr operations"
+        - "hr analyst"
         - "human resource"
         - "human resources"
+        - "people analytics"
+        - "talent analytics"
         - "recruitment"
+        - "recruitment analytics"
         - "talent acquisition"
         - "workforce"
     - name: "full_stack"                 # Internship or fresher job, location/stipend rules apply
@@ -98,11 +130,19 @@ filters:
         - "mean stack"
         - "mern"
         - "mean"
-    - name: "digital_marketing"          # Lowest priority, but bypasses to top if it pays well
+    - name: "digital_marketing"          # Lowest of the "named" tiers, but bypasses to top if it pays well
       bypass_location_and_stipend: false
-      bypass_if_stipend_above: 12000     # >12k/month -> treat as top priority
+      bypass_if_stipend_above: 10000     # >10k/month -> treat as top priority
       keywords:
         - "digital marketing"
+        - "marketing automation"
+        - "marketing automation analyst"
+        - "growth automation"
+    - name: "generic_analyst_catchall"   # Broad titles ("Junior Analyst") - real noise risk, kept lowest priority
+      bypass_location_and_stipend: false
+      keywords:
+        - "junior analyst"
+        - "associate analyst"
 
   # Keywords that immediately disqualify a job if found in the title,
   # regardless of which role_group it matched
@@ -112,6 +152,31 @@ filters:
     - "manager"
     - "10+ years"
     - "principal"
+    # Cross-industry noise: generic titles like "Research Analyst" and
+    # "Business Analyst" get reused across totally unrelated fields.
+    # These exclude the most common false-positive domains.
+    - "equity research"
+    - "equity analyst"
+    - "investment analyst"
+    - "financial analyst"
+    - "credit analyst"
+    - "actuary"
+    - "actuarial"
+    - "insurance claims"
+    - "underwriter"
+    - "clinical"
+    - "pharma"
+    - "pharmaceutical"
+    - "hospital"
+    - "nurse"
+    - "nursing"
+    - "medical device"
+    - "healthcare operations"
+    - "law firm"
+    - "attorney"
+    - "legal counsel"
+    - "paralegal"
+    - "litigation"
 
   # Locations to reject ALWAYS - applies even to role_groups with
   # bypass_location_and_stipend: true (e.g. core roles). This is a hard
@@ -167,6 +232,8 @@ filters:
       - min_stipend: 15000
         locations:
           - "noida"
+          - "Guwahati"
+          - "Noida"
 
   # Secondary sort order WITHIN each role_group's priority tier - doesn't
   # affect whether a job passes the filter, only what order matching jobs
@@ -254,9 +321,10 @@ filters:
 
 # --- Output ---
 output:
-  max_jobs_per_message: 12
+  min_jobs_per_message: 10
+  max_jobs_per_message: 15
 
 # --- Dedup ---
 dedup:
   state_file: "seen_jobs.json"
-  prune_after_days: 30
+  prune_after_days: 10
