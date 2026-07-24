@@ -324,6 +324,16 @@ output:
   min_jobs_per_message: 10
   max_jobs_per_message: 15
 
+# --- Digest (full refresh check-in) ---
+# If no genuinely new jobs have been sent for this many days, send a
+# full snapshot of everything CURRENTLY matching your filters (ignoring
+# dedup) instead of staying silent - a reassurance that the bot is
+# still working during quiet stretches, not just repeated spam.
+digest:
+  enabled: true
+  trigger_after_days_no_new: 2
+  state_file: "notify_state.json"
+
 # --- Dedup ---
 dedup:
   state_file: "seen_jobs.json"

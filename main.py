@@ -13,7 +13,8 @@ import yaml
 from filter import apply_filters
 from dedup import filter_new_jobs
 from priority import sort_by_priority
-from notify import format_message, send_telegram_message
+from notify import format_message, format_digest_message, send_telegram_message
+from notify_state import days_since_last_send, record_send
 
 from sources import indeed, internshala, technopark_infopark, kerala_gov
 
@@ -68,7 +69,26 @@ def main():
     new_jobs = sort_by_priority(new_jobs, config)
 
     max_jobs = config.get("output", {}).get("max_jobs_per_message", 10)
-    message = format_message(new_jobs, max_jobs)
+    digest_cfg = config.get("digest", {})
+    digest_enabled = digest_cfg.get("enabled", False)
+    digest_state_file = digest_cfg.get("state_file", "notify_state.json")
+    trigger_after_days = digest_cfg.get("trigger_after_days_no_new", 2)
+
+    if new_jobs:
+        message = format_message(new_jobs, max_jobs)
+        record_send(digest_state_file)
+    elif digest_enabled:
+        days_quiet = days_since_last_send(digest_state_file)
+        print(f"[main] no new jobs; days since last send: {days_quiet}")
+        if days_quiet is None or days_quiet >= trigger_after_days:
+            print(f"[main] triggering digest (threshold: {trigger_after_days} days)")
+            all_current_matches = sort_by_priority(filtered_jobs, config)
+            message = format_digest_message(all_current_matches, max_jobs, days_quiet or 0)
+            record_send(digest_state_file)
+        else:
+            message = format_message(new_jobs, max_jobs)
+    else:
+        message = format_message(new_jobs, max_jobs)
 
     bot_token = config["telegram"]["bot_token"]
     chat_id = config["telegram"]["chat_id"]

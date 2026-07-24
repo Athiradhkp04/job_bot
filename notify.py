@@ -17,12 +17,9 @@ def _escape_html(text):
     )
 
 
-def format_message(jobs, max_jobs):
-    if not jobs:
-        return "😴 No new matches this run."
-
+def _format_job_list(jobs, max_jobs):
     shown = jobs[:max_jobs]
-    lines = [f"🟢 <b>New Job Matches ({len(shown)})</b>\n"]
+    lines = []
 
     for i, job in enumerate(shown, start=1):
         title = _escape_html(job["title"])
@@ -44,6 +41,40 @@ def format_message(jobs, max_jobs):
     if len(jobs) > max_jobs:
         lines.append(f"…and {len(jobs) - max_jobs} more not shown this round.")
 
+    return lines
+
+
+def format_message(jobs, max_jobs):
+    if not jobs:
+        return "😴 No new matches this run."
+
+    shown = jobs[:max_jobs]
+    header = f"🟢 <b>New Job Matches ({len(shown)})</b>\n"
+    lines = [header] + _format_job_list(jobs, max_jobs)
+    return "\n".join(lines)
+
+
+def format_digest_message(jobs, max_jobs, days_quiet):
+    """
+    Full-refresh digest: sent when nothing NEW has come through for a
+    while, so this shows everything CURRENTLY matching the filters
+    (ignoring dedup) as a "here's what's still live" check-in, rather
+    than leaving the person wondering if the bot is still working.
+    """
+    if not jobs:
+        return (
+            f"📋 <b>Refresh check-in</b>\n\n"
+            f"No new matches for {days_quiet} days, and nothing currently "
+            f"matches your filters either. Bot's still running fine - just a quiet stretch."
+        )
+
+    shown = jobs[:max_jobs]
+    header = (
+        f"📋 <b>Refresh Check-In — {len(shown)} Currently Live Match(es)</b>\n"
+        f"No new postings for {days_quiet} days, so here's everything still "
+        f"matching your filters right now (may include jobs you've seen before):\n"
+    )
+    lines = [header] + _format_job_list(jobs, max_jobs)
     return "\n".join(lines)
 
 
