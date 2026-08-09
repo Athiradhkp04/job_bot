@@ -7,6 +7,14 @@ import re
 
 STIPEND_NUMBER_RE = re.compile(r"[\d,]+")
 
+# The stipend thresholds in config.yaml are Rs/month figures, so a
+# number is only comparable against them once it's known to be rupees.
+INR_RE = re.compile(r"₹|\brs\.?\b|\binr\b", re.IGNORECASE)
+FOREIGN_CURRENCY_RE = re.compile(
+    r"[$€£¥₩₽]|\b(usd|eur|gbp|cad|aud|nzd|sgd|chf|jpy|cny|hkd|twd|krw|pln|czk|huf|ron|bgn|sek|nok|dkk|isk|try|ils|aed|sar|qar|zar|ngn|kes|egp|brl|mxn|ars|clp|cop|pen|uah|rub|thb|idr|myr|vnd|php|lkr|pkr|bdt|npr)\b",
+    re.IGNORECASE,
+)
+
 AGE_PATTERNS = [
     (re.compile(r"^today$", re.IGNORECASE), 0),
     (re.compile(r"^yesterday$", re.IGNORECASE), 1),
@@ -52,11 +60,24 @@ def parse_age_in_days(date_posted_str):
 
 
 def parse_stipend_value(stipend_str):
+    """
+    Returns a monthly-equivalent rupee figure, or None when no rupee
+    figure can be established.
+
+    Foreign-currency pay (remote/global listings quote USD, EUR and so
+    on) returns None rather than a converted number: comparing it to
+    the Rs/month thresholds would need live exchange rates, and reading
+    it as rupees would be worse than not reading it at all. None gets
+    the same benefit of the doubt "Competitive stipend" already gets -
+    the job passes location rules and sorts at its default rank.
+    """
     if not stipend_str:
         return None
     s = stipend_str.lower()
     if "unpaid" in s:
         return 0
+    if FOREIGN_CURRENCY_RE.search(s) and not INR_RE.search(s):
+        return None
     numbers = STIPEND_NUMBER_RE.findall(stipend_str)
     if not numbers:
         return None

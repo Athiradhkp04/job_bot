@@ -6,13 +6,22 @@ source a job came from.
 """
 
 import hashlib
+from urllib.parse import urlsplit, urlunsplit
 
 
 def make_job(title, company, location, employment_type, stipend,
-             date_posted, link, source):
+             date_posted, link, source, apply_url=None):
     """
     Build a normalized job dict. Fields that a source can't find
     should be passed as None - downstream code handles that gracefully.
+
+    `apply_url` is the employer-side destination a listing points at
+    (an ATS page, or the aggregator the listing was syndicated from).
+    Aggregators re-publish each other - FresherGo, for instance, carries
+    a large share of Himalayas and Arbeitnow postings - so the same role
+    reaches us under several different wrapper links. The apply URL is
+    the one identifier those copies agree on, which is what makes it the
+    dedup basis rather than `link`.
     """
     return {
         "title": (title or "Untitled role").strip(),
@@ -22,14 +31,40 @@ def make_job(title, company, location, employment_type, stipend,
         "stipend": (stipend or "Not disclosed").strip(),
         "date_posted": (date_posted or "Unknown").strip(),
         "link": (link or "").strip(),
+        "apply_url": (apply_url or "").strip(),
         "source": source,
     }
 
 
+def normalize_url(url):
+    """
+    Strips the parts of a URL that vary between copies of the same
+    posting without changing where it points: scheme, a leading "www.",
+    tracking query strings, fragments, and a trailing slash.
+    """
+    if not url:
+        return ""
+    parts = urlsplit(url.strip())
+    if not parts.netloc:
+        return url.strip().lower().rstrip("/")
+    host = parts.netloc.lower()
+    if host.startswith("www."):
+        host = host[4:]
+    path = parts.path.rstrip("/")
+    return urlunsplit(("", host, path, "", "")).lstrip("/").lower()
+
+
 def job_hash(job):
     """
-    Stable identifier for dedup. Based on link primarily (most unique),
-    falling back to title+company if a link is somehow missing.
+    Stable identifier for dedup, preferring the apply URL so the same
+    role syndicated through two different boards collapses to one entry.
+    Falls back to the listing link (which is what sources predating
+    apply_url provide, so their existing state-file hashes stay valid),
+    then to title+company if there's no link at all.
     """
-    basis = job.get("link") or f"{job['title']}|{job['company']}"
+    basis = (
+        normalize_url(job.get("apply_url"))
+        or job.get("link")
+        or f"{job['title']}|{job['company']}"
+    )
     return hashlib.sha256(basis.encode("utf-8")).hexdigest()
