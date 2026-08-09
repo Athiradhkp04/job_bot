@@ -6,7 +6,24 @@ source a job came from.
 """
 
 import hashlib
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+# Query parameters that describe where a click came from rather than
+# which job it points at. Everything else in the query is kept, since
+# plenty of boards put the job id there ("?gh_jid=123", "?jobId=456")
+# and dropping it would merge two openings at the same employer into
+# one - which dedup would then treat as already sent forever.
+TRACKING_PARAMS = {
+    "fbclid",
+    "gclid",
+    "mc_cid",
+    "mc_eid",
+    "msclkid",
+    "ref",
+    "referrer",
+    "source",
+    "src",
+}
 
 
 def make_job(title, company, location, employment_type, stipend,
@@ -40,18 +57,27 @@ def normalize_url(url):
     """
     Strips the parts of a URL that vary between copies of the same
     posting without changing where it points: scheme, a leading "www.",
-    tracking query strings, fragments, and a trailing slash.
+    tracking parameters, fragments, query-parameter order, and a
+    trailing slash.
     """
     if not url:
         return ""
     parts = urlsplit(url.strip())
     if not parts.netloc:
         return url.strip().lower().rstrip("/")
+
     host = parts.netloc.lower()
     if host.startswith("www."):
         host = host[4:]
-    path = parts.path.rstrip("/")
-    return urlunsplit(("", host, path, "", "")).lstrip("/").lower()
+
+    query = sorted(
+        (key, value)
+        for key, value in parse_qsl(parts.query, keep_blank_values=True)
+        if key.lower() not in TRACKING_PARAMS and not key.lower().startswith("utm_")
+    )
+
+    normalized = urlunsplit(("", host, parts.path.rstrip("/"), urlencode(query), ""))
+    return normalized.lstrip("/").lower()
 
 
 def job_hash(job):

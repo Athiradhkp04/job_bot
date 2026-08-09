@@ -45,9 +45,16 @@ def fetch(config):
 
     jobs = []
     for page in range(1, max_pages + 1):
-        resp = requests.get(API_URL, params={"page": page}, headers=HEADERS, timeout=20)
-        resp.raise_for_status()
-        payload = resp.json()
+        try:
+            resp = requests.get(API_URL, params={"page": page}, headers=HEADERS, timeout=20)
+            resp.raise_for_status()
+            payload = resp.json()
+        except (requests.RequestException, ValueError) as e:
+            # Keep the pages already fetched rather than losing the
+            # whole source to one bad request.
+            print(f"[arbeitnow] fetch failed on page {page}: {e}")
+            break
+
         entries = payload.get("data", [])
         if not entries:
             break

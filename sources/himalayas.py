@@ -65,14 +65,21 @@ def fetch(config):
     offset = 0
 
     while len(jobs) < limit:
-        resp = requests.get(
-            API_URL,
-            params={"limit": PAGE_SIZE, "offset": offset},
-            headers=HEADERS,
-            timeout=20,
-        )
-        resp.raise_for_status()
-        entries = resp.json().get("jobs", [])
+        try:
+            resp = requests.get(
+                API_URL,
+                params={"limit": PAGE_SIZE, "offset": offset},
+                headers=HEADERS,
+                timeout=20,
+            )
+            resp.raise_for_status()
+            entries = resp.json().get("jobs", [])
+        except (requests.RequestException, ValueError) as e:
+            # Keep the offsets already fetched rather than losing the
+            # whole source to one bad request.
+            print(f"[himalayas] fetch failed at offset {offset}: {e}")
+            break
+
         if not entries:
             break
 
