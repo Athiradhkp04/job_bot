@@ -29,8 +29,53 @@ sources:
     location: "kerala"
 
     max_pages_per_category: 3            # how many pages deep to check per category (catches listings beyond page 1)
+
+  freshergo:
+    enabled: true
+    # FresherGo is entry-level-only by design, so almost everything it
+    # returns is in scope. It has no Kerala coverage (its Kerala/Kochi/
+    # Trivandrum city pages exist but are empty), so it contributes
+    # mainly remote roles plus the metro cities listed below.
+    role_slugs:
+      - "data-analyst"
+      - "ai-engineer"
+      - "backend-developer"
+      - "frontend-developer"
+      - "fullstack-developer"
+      - "product-manager"
+    city_slugs:                          # only these two had listings when this was built; chennai/hyderabad/mumbai pages exist but return nothing
+      - "bangalore"
+      - "delhi-ncr"
+    include_remote_jobs: true
+    include_internships: true
+    max_pages_per_listing: 3             # ~20 listings per page
+
+  # --- Remote/WFH job APIs (free, no key, no scraping) ---
+  remoteok:
+    enabled: true
+    max_jobs: 200
+  himalayas:
+    enabled: true
+    max_jobs: 200
+    excluded_seniority:                  # dropped before title filtering; catches senior roles whose title doesn't say so
+      - "senior"
+      - "manager"
+      - "executive"
+      - "director"
+  jobicy:
+    enabled: true
+    max_jobs: 50                         # API caps `count` at 50
+    # geo: "india"                       # optional; unset = worldwide remote roles too
+    excluded_levels:
+      - "senior"
+      - "executive"
+  arbeitnow:
+    enabled: true
+    max_pages: 2
+    remote_only: true                    # Arbeitnow is a general Europe board; without this most listings are on-site German roles
+
   technopark_infopark:
-    enabled: false   # Site is JavaScript-rendered - a plain scrape can't see listings. Needs a headless browser to fix properly.
+    enabled: false   # Still JS-rendered, and both aggregator alternatives were checked and rejected - see "Technopark / Infopark" in README.md.
   kerala_gov:
     enabled: false   # Returned 0 jobs - likely JS-rendered too, or different page structure than expected.
 

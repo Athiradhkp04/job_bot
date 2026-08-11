@@ -12,15 +12,31 @@ import yaml
 
 from filter import apply_filters
 from dedup import filter_new_jobs
+from job_model import job_hash
 from priority import sort_by_priority
 from notify import format_message, format_digest_message, send_telegram_message
 from notify_state import days_since_last_send, record_send
 
-from sources import indeed, internshala, technopark_infopark, kerala_gov
+from sources import (
+    arbeitnow,
+    freshergo,
+    himalayas,
+    indeed,
+    internshala,
+    jobicy,
+    kerala_gov,
+    remoteok,
+    technopark_infopark,
+)
 
 SOURCE_MODULES = {
     "indeed": indeed,
     "internshala": internshala,
+    "freshergo": freshergo,
+    "remoteok": remoteok,
+    "himalayas": himalayas,
+    "jobicy": jobicy,
+    "arbeitnow": arbeitnow,
     "technopark_infopark": technopark_infopark,
     "kerala_gov": kerala_gov,
 }
@@ -32,6 +48,29 @@ def load_config(path="config.yaml"):
     for key, value in os.environ.items():
         raw = raw.replace(f"${{{key}}}", value)
     return yaml.safe_load(raw)
+
+
+def deduplicate(jobs):
+    """
+    Collapses copies of the same posting within a single run, keeping
+    the first one seen.
+
+    This is separate from `dedup.py`, which answers "have I already SENT
+    this?" across runs. This one answers "did two sources just hand me
+    the same job?" - unavoidable now that aggregators re-publish each
+    other, and it also stops one listing appearing on several FresherGo
+    listing pages from being counted repeatedly. Doing it here means the
+    digest path (which bypasses the state file) gets it too.
+    """
+    seen = set()
+    unique = []
+    for job in jobs:
+        h = job_hash(job)
+        if h in seen:
+            continue
+        seen.add(h)
+        unique.append(job)
+    return unique
 
 
 def collect_all_jobs(config):
@@ -54,8 +93,8 @@ def collect_all_jobs(config):
 def main():
     config = load_config()
 
-    raw_jobs = collect_all_jobs(config)
-    print(f"[main] total raw jobs collected: {len(raw_jobs)}")
+    raw_jobs = deduplicate(collect_all_jobs(config))
+    print(f"[main] total raw jobs collected (after cross-source dedup): {len(raw_jobs)}")
     print("[main] sample titles collected:")
     for job in raw_jobs[:15]:
         print(f"  - {job['title']}")
