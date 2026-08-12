@@ -113,19 +113,67 @@ def format_digest_message(jobs, max_jobs, days_quiet, wfh_jobs=None):
     return "\n".join(lines)
 
 
+def _split_message(text, max_length=4096):
+    """
+    Split a message into multiple parts if it exceeds Telegram's character limit.
+    Tries to split at reasonable boundaries (newlines) to avoid cutting mid-sentence.
+    """
+    if len(text) <= max_length:
+        return [text]
+    
+    messages = []
+    current_message = ""
+    
+    # Split by lines first
+    lines = text.split('\n')
+    
+    for line in lines:
+        # If adding this line would exceed the limit, start a new message
+        if len(current_message) + len(line) + 1 > max_length:
+            if current_message:
+                messages.append(current_message)
+                current_message = ""
+            # If a single line is too long, split it by force
+            if len(line) > max_length:
+                for i in range(0, len(line), max_length):
+                    chunk = line[i:i + max_length]
+                    messages.append(chunk)
+            else:
+                current_message = line
+        else:
+            if current_message:
+                current_message += "\n" + line
+            else:
+                current_message = line
+    
+    if current_message:
+        messages.append(current_message)
+    
+    return messages
+
+
 def send_telegram_message(bot_token, chat_id, text):
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    payload = {
-        "chat_id": chat_id,
-        "text": text,
-        "parse_mode": "HTML",
-        "disable_web_page_preview": True,
-    }
-    try:
-        resp = requests.post(url, data=payload, timeout=15)
-        resp.raise_for_status()
-        return True
-    except requests.RequestException as e:
-        print(f"[notify] failed to send Telegram message: {e}")
-        print(f"[notify] response: {getattr(e.response, 'text', 'N/A')}")
-        return False
+    """
+    Send a Telegram message, splitting it into multiple messages if it exceeds
+    the 4096 character limit.
+    """
+    messages = _split_message(text)
+    
+    for i, message in enumerate(messages, start=1):
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        payload = {
+            "chat_id": chat_id,
+            "text": message,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True,
+        }
+        try:
+            resp = requests.post(url, data=payload, timeout=15)
+            resp.raise_for_status()
+            print(f"[notify] sent message part {i}/{len(messages)} ({len(message)} chars)")
+        except requests.RequestException as e:
+            print(f"[notify] failed to send Telegram message part {i}/{len(messages)}: {e}")
+            print(f"[notify] response: {getattr(e.response, 'text', 'N/A')}")
+            return False
+    
+    return True

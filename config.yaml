@@ -46,7 +46,8 @@ sources:
       - "trichy"
       - "mangalore"
       - "mangaluru"
-    max_pages_per_category: 2            # Fetch more pages to get better coverage
+    max_pages_per_category: 1            # Reduced to 1 page per location to manage request volume (19 locations × 7 categories × 1 page = 133 requests)
+    max_concurrent_requests: 5           # Number of parallel requests to make (start conservative)
   technopark_infopark:
     enabled: false   # Site is JavaScript-rendered - a plain scrape can't see listings. Needs a headless browser to fix properly.
   kerala_gov:

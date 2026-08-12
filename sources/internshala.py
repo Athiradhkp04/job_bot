@@ -34,6 +34,7 @@ import re
 import requests
 from bs4 import BeautifulSoup
 from job_model import make_job
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 BASE_URL = "https://internshala.com/internships/{category}-internship-in-{location}"
 FRESHER_JOBS_BASE_URL = "https://internshala.com/fresher-jobs/{category}-jobs-in-{location}"
@@ -177,15 +178,37 @@ def fetch(config):
     fresher_job_categories = src_cfg.get("fresher_job_categories", [])
     locations = src_cfg.get("locations", ["kerala"])
     max_pages = src_cfg.get("max_pages_per_category", 3)
+    max_concurrent = src_cfg.get("max_concurrent_requests", 5)  # Default to 5 concurrent requests
 
     jobs = []
-
+    
+    # Build list of all combinations to fetch
+    combinations = []
     for category in categories:
         for location in locations:
-            jobs.extend(_fetch_category(BASE_URL, category, location, "Internship", max_pages))
-
+            combinations.append((BASE_URL, category, location, "Internship", max_pages))
+    
     for category in fresher_job_categories:
         for location in locations:
-            jobs.extend(_fetch_category(FRESHER_JOBS_BASE_URL, category, location, "Full-time (Fresher)", max_pages))
+            combinations.append((FRESHER_JOBS_BASE_URL, category, location, "Full-time (Fresher)", max_pages))
+    
+    print(f"[internshala] fetching {len(combinations)} category-location combinations with max {max_concurrent} concurrent requests")
+    
+    # Fetch combinations in parallel
+    with ThreadPoolExecutor(max_workers=max_concurrent) as executor:
+        future_to_combo = {
+            executor.submit(_fetch_category, *combo): combo 
+            for combo in combinations
+        }
+        
+        for future in as_completed(future_to_combo):
+            combo = future_to_combo[future]
+            try:
+                combo_jobs = future.result()
+                jobs.extend(combo_jobs)
+            except Exception as e:
+                base_url, category, location, emp_type, _ = combo
+                print(f"[internshala] failed to fetch {category} in {location}: {e}")
+                continue
 
     return jobs

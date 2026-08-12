@@ -8,8 +8,11 @@ This module fetches jobs from Himalayas and filters them for:
 1. Entry-level seniority only (no Mid-level, Senior, Manager, Executive)
 2. "fresher" keyword presence in title, excerpt, or description
 3. Two output categories:
-   - WFH/Remote: jobs with no location restrictions (purely remote)
+   - WFH/Remote: jobs with no location restrictions (purely remote) - now includes ALL remote jobs, not just South India
    - South India onsite/hybrid: jobs matching configured South India locations
+
+Note: WFH/Remote branch no longer restricts to South India only. All Entry-level remote jobs
+are included, with South India locations prioritized via the existing priority ranking system.
 """
 
 import requests
@@ -97,7 +100,10 @@ def fetch(config):
     
     Note: Himalayas API returns paginated results (default 20 per page).
     We fetch multiple pages to get more results, since Entry-level roles
-    in South India may be sparse. Number of pages is configurable via max_pages.
+    may be sparse. Number of pages is configurable via max_pages.
+    
+    WFH/Remote branch now includes ALL remote jobs regardless of location,
+    with South India locations prioritized via the existing priority ranking system.
     """
     src_cfg = config["sources"].get("himalayas", {})
     if not src_cfg.get("enabled", False):
@@ -183,8 +189,10 @@ def fetch(config):
             
             # Categorize job based on location
             if _is_pure_remote(job_data):
+                # WFH branch: include ALL remote jobs, not just South India
                 wfh_jobs.append(job)
             elif _matches_south_india_location(job_data, south_india_locations):
+                # South India onsite/hybrid: still separate category
                 south_india_jobs.append(job)
                 
         except Exception as e:
@@ -192,5 +200,5 @@ def fetch(config):
             continue
 
     print(f"[himalayas] processed {len(jobs_data)} total jobs from API")
-    print(f"[himalayas] returned {len(wfh_jobs)} WFH jobs, {len(south_india_jobs)} South India jobs")
+    print(f"[himalayas] returned {len(wfh_jobs)} WFH jobs (all locations), {len(south_india_jobs)} South India jobs")
     return wfh_jobs, south_india_jobs
