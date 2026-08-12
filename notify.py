@@ -44,37 +44,72 @@ def _format_job_list(jobs, max_jobs):
     return lines
 
 
-def format_message(jobs, max_jobs):
-    if not jobs:
+def format_message(jobs, max_jobs, wfh_jobs=None):
+    """
+    Format message with two sections:
+    - Onsite/Hybrid (Internshala + Himalayas South India)
+    - WFH/Remote (Himalayas purely remote)
+    """
+    if not jobs and not wfh_jobs:
         return "😴 No new matches this run."
 
-    shown = jobs[:max_jobs]
-    header = f"🟢 <b>New Job Matches ({len(shown)})</b>\n"
-    lines = [header] + _format_job_list(jobs, max_jobs)
+    lines = []
+    
+    # Add Onsite/Hybrid section if there are onsite/hybrid jobs
+    if jobs:
+        shown = jobs[:max_jobs]
+        header = f"� <b>Onsite/Hybrid Jobs ({len(shown)})</b>\n"
+        lines.append(header)
+        lines.extend(_format_job_list(jobs, max_jobs))
+        lines.append("")  # Empty line separator
+    
+    # Add WFH/Remote section if there are WFH jobs
+    if wfh_jobs:
+        wfh_shown = wfh_jobs[:max_jobs]
+        wfh_header = f"🌍 <b>WFH/Remote Jobs ({len(wfh_shown)})</b>\n"
+        lines.append(wfh_header)
+        lines.extend(_format_job_list(wfh_jobs, max_jobs))
+    
     return "\n".join(lines)
 
 
-def format_digest_message(jobs, max_jobs, days_quiet):
+def format_digest_message(jobs, max_jobs, days_quiet, wfh_jobs=None):
     """
     Full-refresh digest: sent when nothing NEW has come through for a
     while, so this shows everything CURRENTLY matching the filters
     (ignoring dedup) as a "here's what's still live" check-in, rather
     than leaving the person wondering if the bot is still working.
+    
+    Uses the same two-section structure as format_message.
     """
-    if not jobs:
+    if not jobs and not wfh_jobs:
         return (
             f"📋 <b>Refresh check-in</b>\n\n"
             f"No new matches for {days_quiet} days, and nothing currently "
             f"matches your filters either. Bot's still running fine - just a quiet stretch."
         )
 
-    shown = jobs[:max_jobs]
-    header = (
-        f"📋 <b>Refresh Check-In — {len(shown)} Currently Live Match(es)</b>\n"
-        f"No new postings for {days_quiet} days, so here's everything still "
-        f"matching your filters right now (may include jobs you've seen before):\n"
-    )
-    lines = [header] + _format_job_list(jobs, max_jobs)
+    lines = []
+    
+    # Add Onsite/Hybrid section if there are onsite/hybrid jobs
+    if jobs:
+        shown = jobs[:max_jobs]
+        header = (
+            f"🏢 <b>Onsite/Hybrid Jobs — Currently Live ({len(shown)})</b>\n"
+            f"No new postings for {days_quiet} days, so here's everything still "
+            f"matching your filters right now (may include jobs you've seen before):\n"
+        )
+        lines.append(header)
+        lines.extend(_format_job_list(jobs, max_jobs))
+        lines.append("")  # Empty line separator
+    
+    # Add WFH/Remote section if there are WFH jobs
+    if wfh_jobs:
+        wfh_shown = wfh_jobs[:max_jobs]
+        wfh_header = f"🌍 <b>WFH/Remote Jobs — Currently Live ({len(wfh_shown)})</b>\n"
+        lines.append(wfh_header)
+        lines.extend(_format_job_list(wfh_jobs, max_jobs))
+    
     return "\n".join(lines)
 
 

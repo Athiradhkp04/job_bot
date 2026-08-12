@@ -7,6 +7,10 @@ import re
 
 STIPEND_NUMBER_RE = re.compile(r"[\d,]+")
 
+# Experience range patterns: "0-2 years", "1-3 years", "2+ years", etc.
+EXPERIENCE_RANGE_RE = re.compile(r"(\d+)\s*[-–to]\s*(\d+)\s*(years?|yrs?)", re.IGNORECASE)
+EXPERIENCE_MIN_RE = re.compile(r"(\d+)\+?\s*(years?|yrs?)", re.IGNORECASE)
+
 AGE_PATTERNS = [
     (re.compile(r"^today$", re.IGNORECASE), 0),
     (re.compile(r"^yesterday$", re.IGNORECASE), 1),
@@ -67,6 +71,72 @@ def parse_stipend_value(stipend_str):
     return value
 
 
+def parse_experience_requirement(job_text):
+    """
+    Parse experience requirement from job text (title, description, etc.).
+    Returns the upper bound of the experience range in years, or None if no
+    requirement is found.
+    
+    Examples:
+    - "0-2 years" -> 2
+    - "1-3 years" -> 3 (rejected since > 2)
+    - "0-5 years" -> 5 (rejected since > 2)
+    - "2+ years" -> 2 (acceptable)
+    - "Entry-level" -> None (no numeric requirement, passes)
+    - "Fresher" -> None (no numeric requirement, passes)
+    """
+    if not job_text:
+        return None
+    
+    text_lower = job_text.lower()
+    
+    # Check for experience range patterns like "0-2 years", "1-3 years"
+    range_match = EXPERIENCE_RANGE_RE.search(text_lower)
+    if range_match:
+        lower_bound = int(range_match.group(1))
+        upper_bound = int(range_match.group(2))
+        return upper_bound
+    
+    # Check for patterns like "2+ years", "3 years experience"
+    min_match = EXPERIENCE_MIN_RE.search(text_lower)
+    if min_match:
+        min_years = int(min_match.group(1))
+        return min_years
+    
+    return None
+
+
+def passes_experience_filter(job):
+    """
+    Check if job passes the experience-level filter.
+    - Jobs with no numeric experience requirement pass by default
+    - Jobs with upper bound > 2 years are rejected
+    - Jobs with "fresher" keyword pass regardless of numeric range
+    """
+    title = job.get("title", "")
+    description = job.get("description", "")
+    
+    # Combine all text that might contain experience info
+    full_text = f"{title} {description}".lower()
+    
+    # Check for fresher keyword - strong positive signal
+    if "fresher" in full_text:
+        return True
+    
+    # Parse experience requirement
+    upper_bound = parse_experience_requirement(full_text)
+    
+    # No numeric requirement found - passes by default
+    if upper_bound is None:
+        return True
+    
+    # Reject if upper bound exceeds 2 years
+    if upper_bound > 2:
+        return False
+    
+    return True
+
+
 def passes_location_rules(location, stipend_value, location_rules):
     if not location or location == "Not specified":
         return True
@@ -125,6 +195,10 @@ def passes_filters(job, filters):
         age_days = parse_age_in_days(date_posted)
         if age_days is not None and age_days > max_age_days:
             return False
+
+    # Apply experience-level filtering
+    if not passes_experience_filter(job):
+        return False
 
     return True
 

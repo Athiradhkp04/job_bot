@@ -60,6 +60,7 @@ def fetch(config):
                 date_posted=None,
                 link=link,
                 source="Kerala Gov (Knowledge Mission)",
+                description=None,  # Kerala Gov doesn't provide description in listing view
             ))
         except Exception as e:
             print(f"[kerala_gov] skipped one card due to parse error: {e}")

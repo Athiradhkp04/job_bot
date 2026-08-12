@@ -9,7 +9,7 @@ import hashlib
 
 
 def make_job(title, company, location, employment_type, stipend,
-             date_posted, link, source):
+             date_posted, link, source, description=None):
     """
     Build a normalized job dict. Fields that a source can't find
     should be passed as None - downstream code handles that gracefully.
@@ -23,6 +23,7 @@ def make_job(title, company, location, employment_type, stipend,
         "date_posted": (date_posted or "Unknown").strip(),
         "link": (link or "").strip(),
         "source": source,
+        "description": (description or "").strip(),
     }
 
 

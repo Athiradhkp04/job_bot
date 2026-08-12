@@ -67,6 +67,7 @@ def fetch(config):
                 date_posted=None,  # Indeed rarely exposes exact date in listing view
                 link=link,
                 source="Indeed",
+                description=None,  # Indeed doesn't provide description in listing view
             ))
         except Exception as e:
             print(f"[indeed] skipped one card due to parse error: {e}")
