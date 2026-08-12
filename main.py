@@ -12,33 +12,18 @@ import yaml
 
 from filter import apply_filters
 from dedup import filter_new_jobs
-from job_model import job_hash
 from priority import sort_by_priority
 from notify import format_message, format_digest_message, send_telegram_message
 from notify_state import days_since_last_send, record_send
 
-from sources import (
-    arbeitnow,
-    freshergo,
-    himalayas,
-    indeed,
-    internshala,
-    jobicy,
-    kerala_gov,
-    remoteok,
-    technopark_infopark,
-)
+from sources import indeed, internshala, technopark_infopark, kerala_gov, himalayas
 
 SOURCE_MODULES = {
     "indeed": indeed,
     "internshala": internshala,
-    "freshergo": freshergo,
-    "remoteok": remoteok,
-    "himalayas": himalayas,
-    "jobicy": jobicy,
-    "arbeitnow": arbeitnow,
     "technopark_infopark": technopark_infopark,
     "kerala_gov": kerala_gov,
+    "himalayas": himalayas,
 }
 
 
@@ -50,51 +35,41 @@ def load_config(path="config.yaml"):
     return yaml.safe_load(raw)
 
 
-def deduplicate(jobs):
-    """
-    Collapses copies of the same posting within a single run, keeping
-    the first one seen.
-
-    This is separate from `dedup.py`, which answers "have I already SENT
-    this?" across runs. This one answers "did two sources just hand me
-    the same job?" - unavoidable now that aggregators re-publish each
-    other, and it also stops one listing appearing on several FresherGo
-    listing pages from being counted repeatedly. Doing it here means the
-    digest path (which bypasses the state file) gets it too.
-    """
-    seen = set()
-    unique = []
-    for job in jobs:
-        h = job_hash(job)
-        if h in seen:
-            continue
-        seen.add(h)
-        unique.append(job)
-    return unique
-
-
 def collect_all_jobs(config):
     all_jobs = []
+    himalayas_wfh_jobs = []
+    himalayas_south_india_jobs = []
+    
     for name, module in SOURCE_MODULES.items():
         src_cfg = config["sources"].get(name, {})
         if not src_cfg.get("enabled", False):
             continue
         print(f"[main] fetching from {name}...")
         try:
-            jobs = module.fetch(config)
-            print(f"[main] {name} returned {len(jobs)} jobs")
-            all_jobs.extend(jobs)
+            if name == "himalayas":
+                # Himalayas returns two lists: (wfh_jobs, south_india_jobs)
+                wfh, south_india = module.fetch(config)
+                himalayas_wfh_jobs.extend(wfh)
+                himalayas_south_india_jobs.extend(south_india)
+                print(f"[main] {name} returned {len(wfh)} WFH jobs, {len(south_india)} South India jobs")
+                all_jobs.extend(wfh)
+                all_jobs.extend(south_india)
+            else:
+                jobs = module.fetch(config)
+                print(f"[main] {name} returned {len(jobs)} jobs")
+                all_jobs.extend(jobs)
         except Exception as e:
             print(f"[main] {name} failed entirely: {e}")
             continue
-    return all_jobs
+    
+    return all_jobs, himalayas_wfh_jobs, himalayas_south_india_jobs
 
 
 def main():
     config = load_config()
 
-    raw_jobs = deduplicate(collect_all_jobs(config))
-    print(f"[main] total raw jobs collected (after cross-source dedup): {len(raw_jobs)}")
+    raw_jobs, himalayas_wfh_raw, himalayas_south_india_raw = collect_all_jobs(config)
+    print(f"[main] total raw jobs collected: {len(raw_jobs)}")
     print("[main] sample titles collected:")
     for job in raw_jobs[:15]:
         print(f"  - {job['title']}")
@@ -107,6 +82,14 @@ def main():
 
     new_jobs = sort_by_priority(new_jobs, config)
 
+    # Separate jobs into Onsite/Hybrid and WFH/Remote sections
+    # WFH/Remote: Himalayas jobs with no location restrictions
+    # Onsite/Hybrid: Internshala + Himalayas South India jobs
+    wfh_jobs = [job for job in new_jobs if job.get("source") == "Himalayas" and job.get("location") == "Remote"]
+    onsite_hybrid_jobs = [job for job in new_jobs if job not in wfh_jobs]
+    
+    print(f"[main] WFH/Remote jobs: {len(wfh_jobs)}, Onsite/Hybrid jobs: {len(onsite_hybrid_jobs)}")
+
     max_jobs = config.get("output", {}).get("max_jobs_per_message", 10)
     digest_cfg = config.get("digest", {})
     digest_enabled = digest_cfg.get("enabled", False)
@@ -114,7 +97,7 @@ def main():
     trigger_after_days = digest_cfg.get("trigger_after_days_no_new", 2)
 
     if new_jobs:
-        message = format_message(new_jobs, max_jobs)
+        message = format_message(onsite_hybrid_jobs, max_jobs, wfh_jobs=wfh_jobs)
         record_send(digest_state_file)
     elif digest_enabled:
         days_quiet = days_since_last_send(digest_state_file)
@@ -122,12 +105,15 @@ def main():
         if days_quiet is None or days_quiet >= trigger_after_days:
             print(f"[main] triggering digest (threshold: {trigger_after_days} days)")
             all_current_matches = sort_by_priority(filtered_jobs, config)
-            message = format_digest_message(all_current_matches, max_jobs, days_quiet or 0)
+            # Separate for digest too
+            wfh_digest = [job for job in all_current_matches if job.get("source") == "Himalayas" and job.get("location") == "Remote"]
+            onsite_digest = [job for job in all_current_matches if job not in wfh_digest]
+            message = format_digest_message(onsite_digest, max_jobs, days_quiet or 0, wfh_jobs=wfh_digest)
             record_send(digest_state_file)
         else:
-            message = format_message(new_jobs, max_jobs)
+            message = format_message(onsite_hybrid_jobs, max_jobs, wfh_jobs=wfh_jobs)
     else:
-        message = format_message(new_jobs, max_jobs)
+        message = format_message(onsite_hybrid_jobs, max_jobs, wfh_jobs=wfh_jobs)
 
     bot_token = config["telegram"]["bot_token"]
     chat_id = config["telegram"]["chat_id"]

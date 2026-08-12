@@ -26,58 +26,59 @@ sources:
     fresher_job_categories:              # also pulls full-time FRESHER JOBS (not just internships) for these
       - "data-analyst"
       - "full-stack-development"
-    location: "kerala"
-
-    max_pages_per_category: 3            # how many pages deep to check per category (catches listings beyond page 1)
-
-  freshergo:
-    enabled: true
-    # FresherGo is entry-level-only by design, so almost everything it
-    # returns is in scope. It has no Kerala coverage (its Kerala/Kochi/
-    # Trivandrum city pages exist but are empty), so it contributes
-    # mainly remote roles plus the metro cities listed below.
-    role_slugs:
-      - "data-analyst"
-      - "ai-engineer"
-      - "backend-developer"
-      - "frontend-developer"
-      - "fullstack-developer"
-      - "product-manager"
-    city_slugs:                          # only these two had listings when this was built; chennai/hyderabad/mumbai pages exist but return nothing
+    locations:                          # Full South India scope from location_rules.conditional + Kerala
+      - "kerala"
+      - "chennai"
+      - "coimbatore"
       - "bangalore"
-      - "delhi-ncr"
-    include_remote_jobs: true
-    include_internships: true
-    max_pages_per_listing: 3             # ~20 listings per page
-
-  # --- Remote/WFH job APIs (free, no key, no scraping) ---
-  remoteok:
-    enabled: true
-    max_jobs: 200
-  himalayas:
-    enabled: true
-    max_jobs: 200
-    excluded_seniority:                  # dropped before title filtering; catches senior roles whose title doesn't say so
-      - "senior"
-      - "manager"
-      - "executive"
-      - "director"
-  jobicy:
-    enabled: true
-    max_jobs: 50                         # API caps `count` at 50
-    # geo: "india"                       # optional; unset = worldwide remote roles too
-    excluded_levels:
-      - "senior"
-      - "executive"
-  arbeitnow:
-    enabled: true
-    max_pages: 2
-    remote_only: true                    # Arbeitnow is a general Europe board; without this most listings are on-site German roles
-
+      - "bengaluru"
+      - "hyderabad"
+      - "madurai"
+      - "mysore"
+      - "mysuru"
+      - "vizag"
+      - "visakhapatnam"
+      - "vijayawada"
+      - "puducherry"
+      - "pondicherry"
+      - "salem"
+      - "tiruchirappalli"
+      - "trichy"
+      - "mangalore"
+      - "mangaluru"
+    max_pages_per_category: 2            # Fetch more pages to get better coverage
   technopark_infopark:
-    enabled: false   # Still JS-rendered, and both aggregator alternatives were checked and rejected - see "Technopark / Infopark" in README.md.
+    enabled: false   # Site is JavaScript-rendered - a plain scrape can't see listings. Needs a headless browser to fix properly.
   kerala_gov:
     enabled: false   # Returned 0 jobs - likely JS-rendered too, or different page structure than expected.
+  himalayas:
+    enabled: true
+    max_pages: 3                           # Number of API pages to fetch (20 jobs per page, so 3 pages = 60 jobs)
+    # Himalayas provides both WFH/Remote and South India onsite/hybrid jobs
+    # South India locations to filter for (case-insensitive match)
+    south_india_locations:
+      - "india"
+      - "kerala"
+      - "tamil nadu"
+      - "karnataka"
+      - "chennai"
+      - "coimbatore"
+      - "bangalore"
+      - "bengaluru"
+      - "hyderabad"
+      - "madurai"
+      - "mysore"
+      - "mysuru"
+      - "vizag"
+      - "visakhapatnam"
+      - "vijayawada"
+      - "puducherry"
+      - "pondicherry"
+      - "salem"
+      - "tiruchirappalli"
+      - "trichy"
+      - "mangalore"
+      - "mangaluru"
 
 # --- Filtering rules ---
 # role_groups is the single source of truth for BOTH which jobs pass the
@@ -367,7 +368,7 @@ filters:
 # --- Output ---
 output:
   min_jobs_per_message: 10
-  max_jobs_per_message: 15
+  max_jobs_per_message: 20
 
 # --- Digest (full refresh check-in) ---
 # If no genuinely new jobs have been sent for this many days, send a

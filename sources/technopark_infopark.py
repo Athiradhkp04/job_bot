@@ -71,6 +71,7 @@ def _fetch_page(url, park_name):
                 date_posted=None,
                 link=link,
                 source=park_name,
+                description=None,  # Technopark/Infopark don't provide description in listing view
             ))
         except Exception as e:
             print(f"[{park_name}] skipped one card due to parse error: {e}")

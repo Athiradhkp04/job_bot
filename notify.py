@@ -7,25 +7,6 @@ Telegram library needed.
 import requests
 
 
-def is_remote(job):
-    """
-    A job counts as remote purely by what its location says. Every
-    source that knows a role is remote writes "Remote" into the
-    location (see `sources.common.remote_location`), so this needs no
-    per-source knowledge and picks up remote Internshala postings the
-    same way it picks up RemoteOK ones.
-    """
-    location = (job.get("location") or "").lower()
-    return "remote" in location or "work from home" in location
-
-
-def split_remote(jobs):
-    """Splits an already-prioritized list into (local, remote), preserving order."""
-    remote = [job for job in jobs if is_remote(job)]
-    local = [job for job in jobs if not is_remote(job)]
-    return local, remote
-
-
 def _escape_html(text):
     if not text:
         return text
@@ -36,11 +17,11 @@ def _escape_html(text):
     )
 
 
-def _format_job_list(jobs, max_jobs, start_index=1):
+def _format_job_list(jobs, max_jobs):
     shown = jobs[:max_jobs]
     lines = []
 
-    for i, job in enumerate(shown, start=start_index):
+    for i, job in enumerate(shown, start=1):
         title = _escape_html(job["title"])
         company = _escape_html(job["company"])
         location = _escape_html(job["location"])
@@ -49,13 +30,11 @@ def _format_job_list(jobs, max_jobs, start_index=1):
         date_posted = _escape_html(job["date_posted"])
         link = job["link"]
 
-        source = _escape_html(job.get("source") or "")
-
         lines.append(
             f"<b>{i}. {title} — {company}</b>\n"
             f"📍 {location} · {employment_type}\n"
             f"💰 {stipend}\n"
-            f"🗓 {date_posted}" + (f" · via {source}" if source else "") + "\n"
+            f"🗓 {date_posted}\n"
             f"🔗 {link}\n"
         )
 
@@ -65,66 +44,73 @@ def _format_job_list(jobs, max_jobs, start_index=1):
     return lines
 
 
-def _format_sections(jobs, max_jobs, header):
+def format_message(jobs, max_jobs, wfh_jobs=None):
     """
-    Renders the local list first, then remote roles under their own
-    heading.
-
-    One message rather than two: Telegram delivers a second message as a
-    separate notification, which for a bot that already runs 3x a day
-    doubles the interruptions for no extra information. The cap counts
-    across both sections so the total message length is unchanged.
+    Format message with two sections:
+    - Onsite/Hybrid (Internshala + Himalayas South India)
+    - WFH/Remote (Himalayas purely remote)
     """
-    local, remote = split_remote(jobs)
-    shown_local = local[:max_jobs]
-    remaining = max_jobs - len(shown_local)
-    shown_remote = remote[:remaining] if remaining > 0 else []
+    if not jobs and not wfh_jobs:
+        return "😴 No new matches this run."
 
-    lines = [header(len(shown_local) + len(shown_remote))]
-    lines += _format_job_list(local, max_jobs)
-
-    if shown_remote:
-        lines.append(f"🌐 <b>Top WFH Jobs ({len(shown_remote)})</b>\n")
-        lines += _format_job_list(remote, remaining, start_index=len(shown_local) + 1)
-    elif remote:
-        lines.append(f"🌐 …plus {len(remote)} remote match(es), crowded out by the message cap.")
-
+    lines = []
+    
+    # Add Onsite/Hybrid section if there are onsite/hybrid jobs
+    if jobs:
+        shown = jobs[:max_jobs]
+        header = f"� <b>Onsite/Hybrid Jobs ({len(shown)})</b>\n"
+        lines.append(header)
+        lines.extend(_format_job_list(jobs, max_jobs))
+        lines.append("")  # Empty line separator
+    
+    # Add WFH/Remote section if there are WFH jobs
+    if wfh_jobs:
+        wfh_shown = wfh_jobs[:max_jobs]
+        wfh_header = f"🌍 <b>WFH/Remote Jobs ({len(wfh_shown)})</b>\n"
+        lines.append(wfh_header)
+        lines.extend(_format_job_list(wfh_jobs, max_jobs))
+    
     return "\n".join(lines)
 
 
-def format_message(jobs, max_jobs):
-    if not jobs:
-        return "😴 No new matches this run."
-
-    return _format_sections(
-        jobs,
-        max_jobs,
-        lambda count: f"🟢 <b>New Job Matches ({count})</b>\n",
-    )
-
-
-def format_digest_message(jobs, max_jobs, days_quiet):
+def format_digest_message(jobs, max_jobs, days_quiet, wfh_jobs=None):
     """
     Full-refresh digest: sent when nothing NEW has come through for a
     while, so this shows everything CURRENTLY matching the filters
     (ignoring dedup) as a "here's what's still live" check-in, rather
     than leaving the person wondering if the bot is still working.
+    
+    Uses the same two-section structure as format_message.
     """
-    if not jobs:
+    if not jobs and not wfh_jobs:
         return (
             f"📋 <b>Refresh check-in</b>\n\n"
             f"No new matches for {days_quiet} days, and nothing currently "
             f"matches your filters either. Bot's still running fine - just a quiet stretch."
         )
 
-    def header(count):
-        return (
-            f"📋 <b>Refresh Check-In — {count} Currently Live Match(es)</b>\n"
+    lines = []
+    
+    # Add Onsite/Hybrid section if there are onsite/hybrid jobs
+    if jobs:
+        shown = jobs[:max_jobs]
+        header = (
+            f"🏢 <b>Onsite/Hybrid Jobs — Currently Live ({len(shown)})</b>\n"
             f"No new postings for {days_quiet} days, so here's everything still "
             f"matching your filters right now (may include jobs you've seen before):\n"
         )
-
-    return _format_sections(jobs, max_jobs, header)
+        lines.append(header)
+        lines.extend(_format_job_list(jobs, max_jobs))
+        lines.append("")  # Empty line separator
+    
+    # Add WFH/Remote section if there are WFH jobs
+    if wfh_jobs:
+        wfh_shown = wfh_jobs[:max_jobs]
+        wfh_header = f"🌍 <b>WFH/Remote Jobs — Currently Live ({len(wfh_shown)})</b>\n"
+        lines.append(wfh_header)
+        lines.extend(_format_job_list(wfh_jobs, max_jobs))
+    
+    return "\n".join(lines)
 
 
 def send_telegram_message(bot_token, chat_id, text):
