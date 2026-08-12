@@ -41,10 +41,11 @@ def prune_old(seen, prune_after_days):
     return pruned
 
 
-def filter_new_jobs(jobs, config):
+def identify_new_jobs(jobs, config):
     """
-    Returns only the jobs not already present in the state file,
-    and updates + saves the state file with the new jobs' hashes.
+    Returns only the jobs not already present in the state file.
+    Does NOT persist them yet - marking as seen happens after
+    the message is sent, so only actually-sent jobs get marked.
     """
     dedup_cfg = config.get("dedup", {})
     state_file = dedup_cfg.get("state_file", "seen_jobs.json")
@@ -60,7 +61,6 @@ def filter_new_jobs(jobs, config):
     if len(seen) != len(seen_before_prune):
         print(f"[dedup] pruned {len(seen_before_prune) - len(seen)} entries older than {prune_after_days} days")
 
-    today = datetime.utcnow().strftime("%Y-%m-%d")
     new_jobs = []
     already_seen_count = 0
 
@@ -68,12 +68,40 @@ def filter_new_jobs(jobs, config):
         h = job_hash(job)
         if h not in seen:
             new_jobs.append(job)
-            seen[h] = today
         else:
             already_seen_count += 1
 
     print(f"[dedup] of {len(jobs)} filtered jobs: {len(new_jobs)} new, {already_seen_count} already seen")
+    return new_jobs
+
+
+def mark_jobs_as_seen(jobs, config):
+    """
+    Marks the given jobs as seen by persisting their hashes to the state file.
+    Only call this for jobs that were actually sent in a message.
+    """
+    dedup_cfg = config.get("dedup", {})
+    state_file = dedup_cfg.get("state_file", "seen_jobs.json")
+    prune_after_days = dedup_cfg.get("prune_after_days", 30)
+
+    seen = load_seen(state_file)
+    seen = prune_old(seen, prune_after_days)
+
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    for job in jobs:
+        h = job_hash(job)
+        seen[h] = today
 
     save_seen(state_file, seen)
-    print(f"[dedup] saved {len(seen)} total entries back to state file")
+    print(f"[dedup] marked {len(jobs)} jobs as seen, saved {len(seen)} total entries")
+
+
+# Legacy function for backward compatibility - now wraps the new flow
+def filter_new_jobs(jobs, config):
+    """
+    Legacy function - now just calls identify_new_jobs + mark_jobs_as_seen.
+    Used only for backward compatibility if anything still calls this directly.
+    """
+    new_jobs = identify_new_jobs(jobs, config)
+    mark_jobs_as_seen(new_jobs, config)
     return new_jobs

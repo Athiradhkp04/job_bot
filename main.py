@@ -11,7 +11,7 @@ import sys
 import yaml
 
 from filter import apply_filters
-from dedup import filter_new_jobs
+from dedup import identify_new_jobs, mark_jobs_as_seen
 from priority import sort_by_priority
 from notify import format_message, format_digest_message, send_telegram_message
 from notify_state import days_since_last_send, record_send
@@ -77,9 +77,11 @@ def main():
     filtered_jobs = apply_filters(raw_jobs, config)
     print(f"[main] jobs after filtering: {len(filtered_jobs)}")
 
-    new_jobs = filter_new_jobs(filtered_jobs, config)
-    print(f"[main] new jobs after dedup: {len(new_jobs)}")
+    # Identify new jobs (don't mark as seen yet)
+    new_jobs = identify_new_jobs(filtered_jobs, config)
+    print(f"[main] new jobs identified: {len(new_jobs)}")
 
+    # Sort by priority
     new_jobs = sort_by_priority(new_jobs, config)
 
     # Separate jobs into Onsite/Hybrid and WFH/Remote sections
@@ -96,8 +98,17 @@ def main():
     digest_state_file = digest_cfg.get("state_file", "notify_state.json")
     trigger_after_days = digest_cfg.get("trigger_after_days_no_new", 2)
 
+    # Determine what to send
+    jobs_to_send = []
+    message = ""
+    
     if new_jobs:
-        message = format_message(onsite_hybrid_jobs, max_jobs, wfh_jobs=wfh_jobs)
+        # Apply max_jobs cap to determine what actually gets sent
+        onsite_to_send = onsite_hybrid_jobs[:max_jobs]
+        wfh_to_send = wfh_jobs[:max_jobs]
+        jobs_to_send = onsite_to_send + wfh_to_send
+        
+        message = format_message(onsite_to_send, max_jobs, wfh_jobs=wfh_to_send)
         record_send(digest_state_file)
     elif digest_enabled:
         days_quiet = days_since_last_send(digest_state_file)
@@ -108,12 +119,24 @@ def main():
             # Separate for digest too
             wfh_digest = [job for job in all_current_matches if job.get("source") == "Himalayas" and job.get("location") == "Remote"]
             onsite_digest = [job for job in all_current_matches if job not in wfh_digest]
-            message = format_digest_message(onsite_digest, max_jobs, days_quiet or 0, wfh_jobs=wfh_digest)
+            
+            # Apply max_jobs cap to digest too
+            onsite_digest_to_send = onsite_digest[:max_jobs]
+            wfh_digest_to_send = wfh_digest[:max_jobs]
+            jobs_to_send = onsite_digest_to_send + wfh_digest_to_send
+            
+            message = format_digest_message(onsite_digest_to_send, max_jobs, days_quiet or 0, wfh_jobs=wfh_digest_to_send)
             record_send(digest_state_file)
         else:
-            message = format_message(onsite_hybrid_jobs, max_jobs, wfh_jobs=wfh_jobs)
+            onsite_to_send = onsite_hybrid_jobs[:max_jobs]
+            wfh_to_send = wfh_jobs[:max_jobs]
+            jobs_to_send = onsite_to_send + wfh_to_send
+            message = format_message(onsite_to_send, max_jobs, wfh_jobs=wfh_to_send)
     else:
-        message = format_message(onsite_hybrid_jobs, max_jobs, wfh_jobs=wfh_jobs)
+        onsite_to_send = onsite_hybrid_jobs[:max_jobs]
+        wfh_to_send = wfh_jobs[:max_jobs]
+        jobs_to_send = onsite_to_send + wfh_to_send
+        message = format_message(onsite_to_send, max_jobs, wfh_jobs=wfh_to_send)
 
     bot_token = config["telegram"]["bot_token"]
     chat_id = config["telegram"]["chat_id"]
@@ -128,6 +151,11 @@ def main():
     success = send_telegram_message(bot_token, chat_id, message)
     if not success:
         sys.exit(1)
+    
+    # Only mark jobs as seen if they were actually sent
+    if jobs_to_send:
+        mark_jobs_as_seen(jobs_to_send, config)
+        print(f"[main] marked {len(jobs_to_send)} jobs as seen (only those sent in message)")
 
     print("[main] done.")
 
