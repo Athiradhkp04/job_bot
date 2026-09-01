@@ -6,11 +6,16 @@ Telegram message, 3x a day. No dashboards, no auto-apply, no AI summaries.
 ## How it works
 1. Fetches postings from Internshala (South India) and Himalayas (Entry-level remote jobs).
 2. Filters them using the rules in `config.yaml` (role keywords, location, stipend, experience level, age).
-3. Drops anything already sent to you (tracked in `seen_jobs.json`).
-4. Sends the top matches as one Telegram message with two sections:
+3. Identifies new jobs (compares against `seen_jobs.json`).
+4. Sorts by priority (role group, then location).
+5. Caps at top 20 jobs per message (configurable).
+6. Sends the top matches as one Telegram message with two sections:
    - **Onsite/Hybrid Jobs** — Internshala (South India) + Himalayas (South India onsite/hybrid)
    - **WFH/Remote Jobs** — Himalayas (Entry-level remote jobs globally)
-5. Exits. Runs again on the next scheduled trigger.
+7. Marks only the sent jobs as "seen" in `seen_jobs.json`.
+8. Exits. Runs again on the next scheduled trigger.
+
+**Important:** Jobs beyond the max_jobs cap (21+) remain unmarked and will appear in future runs when higher-priority jobs age out or are displaced. This prevents permanent loss of valid jobs due to the display cap.
 
 If nothing new turns up for a couple of days, it sends a "refresh
 check-in" digest instead — everything currently matching your filters,
@@ -19,17 +24,17 @@ distinguishable from a broken bot. Configured under `digest:`.
 
 ## Sources
 
-|| Source | Type | Status |
-||---|---|---|
-|| Internshala | HTML scrape | **on** — South India internships + fresher jobs (19 locations) |
-|| Himalayas | JSON API | **on** — Entry-level remote jobs globally + South India onsite/hybrid |
-|| Indeed | — | off — blocks non-browser traffic (403) |
-|| FresherGo | — | off — requires paid plan for actual applications |
-|| RemoteOK | — | off — requires paid plan for actual applications |
-|| Jobicy | — | off — requires paid plan for actual applications |
-|| Arbeitnow | — | off — requires paid plan for actual applications |
-|| Technopark/Infopark | — | off — JS-rendered |
-|| Kerala Gov | — | off — JS-rendered, returned 0 jobs |
+| Source | Type | Status |
+|---|---|---|
+| Internshala | HTML scrape | **on** — South India internships + fresher jobs (19 locations) |
+| Himalayas | JSON API | **on** — Entry-level remote jobs globally + South India onsite/hybrid |
+| Indeed | — | off — blocks non-browser traffic (403) |
+| FresherGo | — | off — requires paid plan for actual applications |
+| RemoteOK | — | off — requires paid plan for actual applications |
+| Jobicy | — | off — requires paid plan for actual applications |
+| Arbeitnow | — | off — requires paid plan for actual applications |
+| Technopark/Infopark | — | off — JS-rendered |
+| Kerala Gov | — | off — JS-rendered, returned 0 jobs |
 
 All active sources are free with no API key and no account. Nothing here costs
 money to run, which is a hard constraint on adding new ones.
@@ -39,6 +44,13 @@ Notes on the active sources:
 - **Internshala** fetches from 19 South India locations (Kerala, Tamil Nadu, Karnataka, Andhra Pradesh, Telangana, Puducherry cities) using concurrent requests (5 at a time) to manage runtime. Uses URL-pattern parsing for stability, not fragile CSS classes.
 - **Himalayas** provides Entry-level remote jobs globally (since Entry-level roles are concentrated outside South India) with South India locations prioritized via the existing ranking system. Also includes South India onsite/hybrid jobs.
 - **Experience filtering** rejects jobs requiring >2 years experience upper bound, prioritizes "fresher" keyword when present.
+
+## Recent improvements
+
+- **Dedup fix:** Only jobs actually sent in messages are marked as "seen" — overflow jobs (beyond max_jobs cap) remain unmarked and will appear in future runs
+- **Concurrent requests:** Internshala uses 5 parallel workers, reducing runtime from 214s to 42s
+- **Message splitting:** Telegram messages >4096 chars are automatically split into sequential messages
+- **Global remote:** Himalayas WFH branch includes all Entry-level remote jobs globally, not just South India
 
 ## One-time setup
 
