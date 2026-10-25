@@ -7,7 +7,7 @@ Telegram message, 3x a day. No dashboards, no auto-apply, no AI summaries.
 1. Fetches postings from Internshala (South India) and Himalayas (Entry-level remote jobs).
 2. Filters them using the rules in `config.yaml` (role keywords, location, stipend, experience level, age).
 3. Identifies new jobs (compares against `seen_jobs.json`).
-4. Sorts by priority (role group, then location).
+4. Sorts by priority (role group, then location, with small boosts for analytics keywords and newer postings).
 5. Caps at top 20 jobs per message (configurable).
 6. Sends the top matches as one Telegram message with two sections:
    - **Onsite/Hybrid Jobs** — Internshala (South India) + Himalayas (South India onsite/hybrid)
@@ -26,7 +26,7 @@ distinguishable from a broken bot. Configured under `digest:`.
 
 | Source | Type | Status |
 |---|---|---|
-| Internshala | HTML scrape | **on** — South India internships + fresher jobs (19 locations) |
+| Internshala | HTML scrape | **on** — South India internships + fresher jobs (22 locations: Kerala cities, Bangalore, Hyderabad, Goa, Pondicherry, Tamil Nadu cities) |
 | Himalayas | JSON API | **on** — Entry-level remote jobs globally + South India onsite/hybrid |
 | Indeed | — | off — blocks non-browser traffic (403) |
 | FresherGo | — | off — requires paid plan for actual applications |
@@ -41,9 +41,44 @@ money to run, which is a hard constraint on adding new ones.
 
 Notes on the active sources:
 
-- **Internshala** fetches from 19 South India locations (Kerala, Tamil Nadu, Karnataka, Andhra Pradesh, Telangana, Puducherry cities) using concurrent requests (5 at a time) to manage runtime. Uses URL-pattern parsing for stability, not fragile CSS classes.
+- **Internshala** fetches from 22 South India locations (Kerala cities, Bangalore, Hyderabad, Goa, Pondicherry, Tamil Nadu cities) using concurrent requests (5 at a time) to manage runtime. Uses URL-pattern parsing for stability, not fragile CSS classes.
 - **Himalayas** provides Entry-level remote jobs globally (since Entry-level roles are concentrated outside South India) with South India locations prioritized via the existing ranking system. Also includes South India onsite/hybrid jobs.
 - **Experience filtering** rejects jobs requiring >2 years experience upper bound, prioritizes "fresher" keyword when present.
+
+## Role targeting
+
+The bot targets ANALYST + OPERATIONS MIX roles for freshers (0-2 years experience):
+
+**Tier 1 (Core) - Top priority, bypasses location/stipend rules:**
+- Data Analyst / Data Scientist / Business Analyst / Business Intelligence / BI Developer / Power BI
+- MIS Executive / Insights Analyst / Reporting Analyst / KPI / Dashboard
+- Operations Analyst / Business Operations Analyst
+
+**Tier 2 (Ops Analytics & HR Analytics) - Location/stipend rules apply:**
+- Business Operations / Process Analyst / Process Associate / Program Coordinator / Project Coordinator
+- ERP Analyst / ERP Intern / Strategy Analyst / Supply Chain Analyst / Procurement Analyst
+- HR Analyst / People Analytics / Talent Analytics / Recruitment Analytics / Workforce Analytics
+- Marketing Analyst / Product Analyst / Research Analyst / RevOps Analyst
+
+**Tier 3 (Gated Operations) - Requires analytics keywords (Excel, SQL, Power BI, Tableau, Dashboard, KPI, Reporting, Analysis, Analytics, MIS, Data):**
+- Operations Intern / Project Management Intern / Client Success / Implementation
+- HR Intern / HR Operations / HR Executive / Recruitment / Talent Acquisition / Logistics
+
+**Tier 3 (Generic Catchall) - Lowest priority:**
+- Junior Analyst / Associate Analyst
+
+**Excluded (rejected regardless of match):**
+- QA / Quality Assurance / Tester / Testing / SDET
+- Software Developer / Java Developer / Web Developer / App Developer / Mobile Developer / Full Stack
+- Network Engineer / Cyber
+- Tax / Telecaller / Sales Executive / Content Writer / Graphic Design / Video Editor
+- Customer Support / Customer Service / Data Entry
+- Financial Analyst / Equity Research / Clinical / Pharma / Insurance / Legal / Nursing
+
+**Matching behavior:**
+- Word-boundary matching is used for bare technical keywords (python, sql, machine learning) to avoid substring matches
+- Bare keywords require a data/analyst/analytics context term in the title to match
+- Core keyword matches are never dropped by exclude keywords (e.g., "Power BI Developer" is kept)
 
 ## Recent improvements
 
@@ -76,11 +111,15 @@ the repo after each run.
 pip install -r requirements.txt
 export TELEGRAM_BOT_TOKEN="your-token"
 export TELEGRAM_CHAT_ID="your-chat-id"
-python main.py
+python main.py              # Normal run (sends Telegram message)
+python main.py --dry-run    # Dry run (no Telegram send, prints output)
 ```
 Each source prints how many jobs it found and whether it failed, so the
 console output (and the GitHub Actions log) shows exactly where a bad
 run went wrong. A full run takes ~40 seconds.
+
+Dry-run mode includes per-source, per-role-group, and per-location-tier
+reporting, plus the top 10 ranked jobs.
 
 ## Scraper fragility
 

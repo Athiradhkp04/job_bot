@@ -4,6 +4,10 @@ fetch -> filter -> dedup -> notify -> exit.
 
 No loops, no daemons - designed to be triggered by an external
 scheduler (GitHub Actions cron, or a plain cron job) three times a day.
+
+Usage:
+    python main.py              # Normal run (sends Telegram message)
+    python main.py --dry-run    # Dry run (no Telegram send, prints output)
 """
 
 import os
@@ -66,16 +70,48 @@ def collect_all_jobs(config):
 
 
 def main():
+    dry_run = "--dry-run" in sys.argv
+    if dry_run:
+        print("[main] DRY RUN MODE - no Telegram messages will be sent")
+    
     config = load_config()
 
     raw_jobs, himalayas_wfh_raw, himalayas_south_india_raw = collect_all_jobs(config)
     print(f"[main] total raw jobs collected: {len(raw_jobs)}")
+    
+    # Per-source reporting
+    source_counts = {}
+    for job in raw_jobs:
+        source = job.get("source", "unknown")
+        source_counts[source] = source_counts.get(source, 0) + 1
+    print(f"[main] jobs by source: {source_counts}")
+    
     print("[main] sample titles collected:")
     for job in raw_jobs[:15]:
         print(f"  - {job['title']}")
 
     filtered_jobs = apply_filters(raw_jobs, config)
     print(f"[main] jobs after filtering: {len(filtered_jobs)}")
+    
+    # Per-role-group reporting
+    filters_cfg = config.get("filters", {})
+    role_groups = filters_cfg.get("role_groups", [])
+    role_counts = {}
+    for job in filtered_jobs:
+        from filter import find_matching_group
+        matched_group = find_matching_group(job.get("title", ""), role_groups)
+        group_name = matched_group.get("name", "unmatched") if matched_group else "unmatched"
+        role_counts[group_name] = role_counts.get(group_name, 0) + 1
+    print(f"[main] jobs by role group: {role_counts}")
+    
+    # Per-location-tier reporting
+    location_priority_cfg = filters_cfg.get("location_priority", {})
+    location_tier_counts = {}
+    for job in filtered_jobs:
+        from priority import assign_location_rank
+        loc_rank = assign_location_rank(job.get("location", ""), None, location_priority_cfg)
+        location_tier_counts[loc_rank] = location_tier_counts.get(loc_rank, 0) + 1
+    print(f"[main] jobs by location tier: {location_tier_counts}")
 
     # Identify new jobs (don't mark as seen yet)
     new_jobs = identify_new_jobs(filtered_jobs, config)
@@ -83,6 +119,12 @@ def main():
 
     # Sort by priority
     new_jobs = sort_by_priority(new_jobs, config)
+    
+    # Top 10 jobs
+    print("[main] top 10 jobs:")
+    for i, job in enumerate(new_jobs[:10], 1):
+        stipend_clean = job.get('stipend', '').replace('\u20b9', 'Rs.').replace('₹', 'Rs.')
+        print(f"  {i}. {job.get('title', '')} - {job.get('location', '')} - {stipend_clean}")
 
     # Separate jobs into Onsite/Hybrid and WFH/Remote sections
     # WFH/Remote: Himalayas jobs with no location restrictions
@@ -137,6 +179,11 @@ def main():
         wfh_to_send = wfh_jobs[:max_jobs]
         jobs_to_send = onsite_to_send + wfh_to_send
         message = format_message(onsite_to_send, max_jobs, wfh_jobs=wfh_to_send)
+
+    if dry_run:
+        print("[main] DRY RUN - skipping Telegram send")
+        print(f"[main] would send {len(jobs_to_send)} jobs")
+        return
 
     bot_token = config["telegram"]["bot_token"]
     chat_id = config["telegram"]["chat_id"]

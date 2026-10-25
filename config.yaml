@@ -21,33 +21,33 @@ sources:
       - "data-science"
       - "business-analyst"
       - "hr"
-      - "digital-marketing"
-      - "full-stack-development"
     fresher_job_categories:              # also pulls full-time FRESHER JOBS (not just internships) for these
       - "data-analyst"
-      - "full-stack-development"
-    locations:                          # Full South India scope from location_rules.conditional + Kerala
+    locations:                          # South India focus for analyst + operations roles
       - "kerala"
+      - "kochi"
+      - "ernakulam"
+      - "kakkanad"
+      - "trivandrum"
+      - "thiruvananthapuram"
+      - "kozhikode"
+      - "calicut"
+      - "thrissur"
+      - "kannur"
+      - "kollam"
       - "chennai"
       - "coimbatore"
       - "bangalore"
       - "bengaluru"
       - "hyderabad"
       - "madurai"
-      - "mysore"
-      - "mysuru"
-      - "vizag"
-      - "visakhapatnam"
-      - "vijayawada"
-      - "puducherry"
+      - "goa"
       - "pondicherry"
       - "salem"
       - "tiruchirappalli"
       - "trichy"
-      - "mangalore"
-      - "mangaluru"
-    max_pages_per_category: 1            # Reduced to 1 page per location to manage request volume (19 locations × 7 categories × 1 page = 133 requests)
-    max_concurrent_requests: 5           # Number of parallel requests to make (start conservative)
+    max_pages_per_category: 1            # Reduced to 1 page per location to manage request volume
+    max_concurrent_requests: 5           # Number of parallel requests to make
   technopark_infopark:
     enabled: false   # Site is JavaScript-rendered - a plain scrape can't see listings. Needs a headless browser to fix properly.
   kerala_gov:
@@ -95,8 +95,12 @@ sources:
 #     priority if it pays above this monthly Rs figure
 filters:
   role_groups:
-    - name: "core"                       # Data Analyst / Data Scientist / Business Analyst / BI / MIS - top priority
+    - name: "core"                       # Data Analyst / Business Analyst / BI / MIS / Operations Analyst - top priority
       bypass_location_and_stipend: true  # no location or stipend restriction at all
+      word_boundary_keywords:           # Keywords that must match as whole words (not substrings)
+        - "python"
+        - "sql"
+        - "machine learning"
       keywords:
         - "data analyst"
         - "data analytics"
@@ -118,23 +122,32 @@ filters:
         - "insights analyst"
         - "junior data analyst"
         - "associate data analyst"
-        - "machine learning"
-        - "python"
-        - "sql"
-    - name: "seo"                        # Internship or fresher job only, location/stipend rules apply
-      bypass_location_and_stipend: false
+        - "operations analyst"
+        - "business operations analyst"
+    - name: "ops_analytics"              # Tier 2: hybrid analyst + operations roles
+      bypass_location_and_stipend: false  # location and stipend rules apply
       keywords:
-        - "seo"
-        - "seo analyst"
-        - "seo executive"
-        - "seo specialist"
-        - "seo consultant"
-        - "seo auditor"
-        - "search engine optimization"
-        - "search engine optimisation"
-        - "search engine"
-    - name: "analyst_adjacent"           # Marketing/Product/Research/RevOps analysts - real skill overlap per resume
-      bypass_location_and_stipend: false
+        - "business operations"
+        - "process analyst"
+        - "process associate"
+        - "program coordinator"
+        - "project coordinator"
+        - "erp analyst"
+        - "erp intern"
+        - "strategy analyst"
+        - "growth analyst"
+        - "supply chain analyst"
+        - "procurement analyst"
+    - name: "hr_analytics"                # Tier 2: HR analytics roles (narrowed from general HR)
+      bypass_location_and_stipend: false  # location and stipend rules apply
+      keywords:
+        - "hr analyst"
+        - "people analytics"
+        - "talent analytics"
+        - "recruitment analytics"
+        - "workforce analytics"
+    - name: "analyst_adjacent"           # Tier 2: Marketing/Product/Research/RevOps analysts
+      bypass_location_and_stipend: false  # location and stipend rules apply
       keywords:
         - "marketing analyst"
         - "digital marketing analyst"
@@ -148,45 +161,33 @@ filters:
         - "product analyst"
         - "research analyst"
         - "market research analyst"
-    - name: "hr"                         # Internship only (HR isn't in fresher_job_categories), location/stipend rules apply
-      bypass_location_and_stipend: false
+    - name: "gated_ops"                  # Tier 3: operations/project management/HR/logistics - only if analytics signals present
+      bypass_location_and_stipend: false  # location and stipend rules apply
+      require_any_keywords:            # Gate: must have at least one analytics keyword to pass
+        - "excel"
+        - "sql"
+        - "power bi"
+        - "tableau"
+        - "dashboard"
+        - "kpi"
+        - "reporting"
+        - "analysis"
+        - "analytics"
+        - "mis"
+        - "data"
       keywords:
-        - "hr "
-        - "hr executive"
+        - "operations intern"
+        - "project management intern"
+        - "client success"
+        - "implementation"
         - "hr intern"
-        - "hr generalist"
         - "hr operations"
-        - "hr analyst"
-        - "human resource"
-        - "human resources"
-        - "people analytics"
-        - "talent analytics"
+        - "hr executive"
         - "recruitment"
-        - "recruitment analytics"
         - "talent acquisition"
-        - "workforce"
-    - name: "full_stack"                 # Internship or fresher job, location/stipend rules apply
-      bypass_location_and_stipend: false
-      keywords:
-        - "full stack"
-        - "full-stack"
-        - "fullstack"
-        - "full stack developer"
-        - "full stack development"
-        - "mern stack"
-        - "mean stack"
-        - "mern"
-        - "mean"
-    - name: "digital_marketing"          # Lowest of the "named" tiers, but bypasses to top if it pays well
-      bypass_location_and_stipend: false
-      bypass_if_stipend_above: 10000     # >10k/month -> treat as top priority
-      keywords:
-        - "digital marketing"
-        - "marketing automation"
-        - "marketing automation analyst"
-        - "growth automation"
-    - name: "generic_analyst_catchall"   # Broad titles ("Junior Analyst") - real noise risk, kept lowest priority
-      bypass_location_and_stipend: false
+        - "logistics"
+    - name: "generic_analyst_catchall"   # Tier 3: broad analyst titles - lowest priority
+      bypass_location_and_stipend: false  # location and stipend rules apply
       keywords:
         - "junior analyst"
         - "associate analyst"
@@ -194,11 +195,28 @@ filters:
   # Keywords that immediately disqualify a job if found in the title,
   # regardless of which role_group it matched
   exclude_keywords:
-    - "senior"
-    - "lead"
-    - "manager"
-    - "10+ years"
-    - "principal"
+    - "qa"
+    - "quality assurance"
+    - "tester"
+    - "testing"
+    - "sdet"
+    - "software developer"
+    - "java developer"
+    - "web developer"
+    - "app developer"
+    - "mobile developer"
+    - "full stack"
+    - "network engineer"
+    - "cyber"
+    - "tax"
+    - "telecaller"
+    - "sales executive"
+    - "content writer"
+    - "graphic design"
+    - "video editor"
+    - "customer support"
+    - "customer service"
+    - "data entry"
     # Cross-industry noise: generic titles like "Research Analyst" and
     # "Business Analyst" get reused across totally unrelated fields.
     # These exclude the most common false-positive domains.
@@ -250,11 +268,16 @@ filters:
       - "hybrid"
       - "kerala"
       - "kochi"
+      - "ernakulam"
+      - "kakkanad"
       - "cochin"
       - "trivandrum"
       - "thiruvananthapuram"
       - "kozhikode"
       - "calicut"
+      - "thrissur"
+      - "kannur"
+      - "kollam"
     conditional:
       - min_stipend: 8000
         locations:
@@ -264,18 +287,11 @@ filters:
           - "bengaluru"
           - "hyderabad"
           - "madurai"
-          - "mysore"
-          - "mysuru"
-          - "vizag"
-          - "visakhapatnam"
-          - "vijayawada"
-          - "puducherry"
+          - "goa"
           - "pondicherry"
           - "salem"
           - "tiruchirappalli"
           - "trichy"
-          - "mangalore"
-          - "mangaluru"
       - min_stipend: 15000
         locations:
           - "noida"
@@ -294,26 +310,36 @@ filters:
   location_priority:
     default_rank: 3
     tiers:
-      - name: "kerala"
+      - name: "kerala_tier1"
         rank: 0
         locations:
           - "kerala"
           - "kochi"
+          - "ernakulam"
+          - "kakkanad"
           - "cochin"
           - "trivandrum"
           - "thiruvananthapuram"
           - "kozhikode"
           - "calicut"
-      - name: "bangalore_mysore"
+          - "thrissur"
+          - "kannur"
+          - "kollam"
+      - name: "tier2_cities"
         rank: 1
         locations:
           - "bangalore"
           - "bengaluru"
-          - "mysore"
-          - "mysuru"
+          - "hyderabad"
+      - name: "tier3_cities"
+        rank: 2
+        locations:
+          - "goa"
+          - "pondicherry"
+          - "puducherry"
       - name: "tamil_nadu"
         min_stipend: 8000
-        rank_if_above: 2       # pays well -> priority boost
+        rank_if_above: 3       # pays well -> priority boost
         rank_if_below: null    # doesn't clear bar -> falls to default_rank (null = use default_rank)
         locations:
           - "chennai"

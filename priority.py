@@ -3,7 +3,9 @@ Assigns each job a priority rank based on:
   1. filters.role_groups (list order = priority order) - PRIMARY sort key
   2. filters.location_priority - SECONDARY sort key within the same role
      tier, so e.g. a Kerala Data Analyst posting shows before an
-     Ahmedabad one even though both are "core" tier.
+     Bangalore one even though both are "core" tier.
+  3. Analytical keyword boost - SMALL bonus for jobs with analytics keywords
+  4. Date bonus - SMALL bonus for newer postings
 
 This reads the SAME role_groups/location_priority config that filter.py
 uses for inclusion/exclusion, so filtering and ordering can never drift
@@ -13,7 +15,8 @@ Lower rank = higher priority = shown first / kept first when the
 message cap is hit.
 """
 
-from filter import parse_stipend_value, find_matching_group, _contains_any
+from filter import parse_stipend_value, find_matching_group, _contains_any, _contains_word_boundary, parse_age_in_days
+from datetime import datetime, timedelta
 
 
 def assign_role_rank(job, role_groups, stipend_value):
@@ -51,6 +54,38 @@ def assign_location_rank(location, stipend_value, location_priority_cfg):
     return default_rank
 
 
+def assign_analytical_boost(job):
+    """
+    Small priority boost for jobs with analytical keywords.
+    Returns a negative value (lower = higher priority) if analytics signals present.
+    """
+    title = job.get("title", "").lower()
+    analytical_keywords = ["excel", "sql", "power bi", "tableau", "dashboard", "kpi", "reporting", "analysis", "analytics", "mis", "data"]
+    
+    if _contains_any(title, analytical_keywords):
+        return -0.1  # Small boost for analytics keywords
+    return 0
+
+
+def assign_date_boost(job):
+    """
+    Small priority boost for newer postings.
+    Returns a negative value (lower = higher priority) based on posting date.
+    Newest postings get highest boost.
+    """
+    date_posted = job.get("date_posted", "")
+    age_days = parse_age_in_days(date_posted)
+    
+    if age_days is None:
+        return 0
+    if age_days == 0:
+        return -0.2  # Fresh jobs get highest boost
+    elif age_days == 1:
+        return -0.1  # Yesterday jobs get small boost
+    else:
+        return 0  # Older jobs get no boost
+
+
 def assign_rank(job, config):
     filters = config.get("filters", {})
     role_groups = filters.get("role_groups", [])
@@ -59,8 +94,12 @@ def assign_rank(job, config):
     stipend_value = parse_stipend_value(job.get("stipend", ""))
     role_rank = assign_role_rank(job, role_groups, stipend_value)
     location_rank = assign_location_rank(job.get("location", ""), stipend_value, location_priority_cfg)
+    analytical_boost = assign_analytical_boost(job)
+    date_boost = assign_date_boost(job)
 
-    return (role_rank, location_rank)
+    # Combine ranks: role_rank (primary), location_rank (secondary), then boosts
+    # Lower values = higher priority
+    return (role_rank, location_rank, analytical_boost + date_boost)
 
 
 def sort_by_priority(jobs, config):

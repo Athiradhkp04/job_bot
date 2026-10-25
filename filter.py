@@ -31,6 +31,23 @@ def _contains_any(text, keywords):
     return any(kw.lower() in text_lower for kw in keywords)
 
 
+def _contains_word_boundary(text, keywords):
+    """
+    Check if text contains any keyword as a whole word (not substring).
+    Used for bare keywords like "python", "sql" to avoid matching "python developer".
+    """
+    if not text:
+        return False
+    text_lower = text.lower()
+    for kw in keywords:
+        kw_lower = kw.lower()
+        # Match as whole word using regex word boundaries
+        pattern = r'\b' + re.escape(kw_lower) + r'\b'
+        if re.search(pattern, text_lower):
+            return True
+    return False
+
+
 def parse_age_in_days(date_posted_str):
     if not date_posted_str:
         return None
@@ -160,8 +177,27 @@ def passes_location_rules(location, stipend_value, location_rules):
 
 def find_matching_group(title, role_groups):
     for group in role_groups:
-        if _contains_any(title, group.get("keywords", [])):
-            return group
+        keywords = group.get("keywords", [])
+        # Check if group requires word-boundary matching for certain keywords
+        word_boundary_keywords = group.get("word_boundary_keywords", [])
+        if word_boundary_keywords:
+            # For bare keywords (python, sql, machine learning), they only count
+            # if the title ALSO contains a data/analyst/analytics context term
+            if _contains_word_boundary(title, word_boundary_keywords):
+                # Check for context terms
+                context_terms = ["data", "analyst", "analytics", "analysis", "intelligence", "scientist"]
+                if _contains_any(title, context_terms):
+                    # Has context + bare keyword, check regular keywords too
+                    if _contains_any(title, keywords):
+                        return group
+            else:
+                # No word-boundary keyword, just check regular keywords
+                if _contains_any(title, keywords):
+                    return group
+        else:
+            # Regular substring matching
+            if _contains_any(title, keywords):
+                return group
     return None
 
 
@@ -176,8 +212,18 @@ def passes_filters(job, filters):
     if not matched_group:
         return False
 
-    if filters.get("exclude_keywords") and _contains_any(title, filters["exclude_keywords"]):
+    # Core keyword matches are never dropped by excludes
+    # This ensures roles like "Power BI Developer" are kept even if they contain substrings
+    # that might match exclude patterns
+    is_core = matched_group.get("name") == "core"
+    if not is_core and filters.get("exclude_keywords") and _contains_any(title, filters["exclude_keywords"]):
         return False
+
+    # Check for required keywords (gate mechanism for Tier 3 roles)
+    required_keywords = matched_group.get("require_any_keywords")
+    if required_keywords:
+        if not _contains_any(title, required_keywords):
+            return False
 
     excluded_locations = filters.get("excluded_locations")
     if excluded_locations and _contains_any(location, excluded_locations):
